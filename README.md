@@ -1,4 +1,4 @@
-# My Minimal NixOS Flake
+# Nord Minimal NixOS Flake
 
 This includes everything for basic use:
 * Custom **Ironbar** bar
