@@ -1,5 +1,8 @@
-{ ... }:
+{ config, ... }:
 
+let
+  cfg = config.myOptions;
+in
 {
   xdg.configFile."niri/config.kdl".text = ''
     environment {
@@ -60,7 +63,7 @@
         border { off; }
     }
 
-    output "HDMI-A-2" {
+    output "${cfg.monitor}" {
         mode "1920x1080@120.000"
         scale 1.0
     }

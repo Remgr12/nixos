@@ -1,6 +1,7 @@
-{ pkgs, inputs, ... }:
+{ config, pkgs, inputs, ... }:
 
 let
+  cfg = config.myOptions;
   ironbar-flake = inputs.ironbar-flake;
 in
 {
@@ -87,7 +88,7 @@ in
   xdg.configFile."ironbar/config.json".text = ''
     {
       "monitors": {
-        "HDMI-A-2": {
+        "${cfg.monitor}": {
           "name": "main-bar",
           "popup_autohide": true,
           "anchor_to_edges": true,

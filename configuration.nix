@@ -1,6 +1,7 @@
 { config, pkgs, lib, inputs, ... }:
 
 let
+  cfg = config.myOptions;
   home-manager-src = builtins.fetchTarball {
     url = "https://github.com/nix-community/home-manager/archive/master.tar.gz";
   };
@@ -21,8 +22,8 @@ in
 
   boot.kernelParams = [ 
     "nvidia-drm.modeset=1" 
-    "drm.edid_firmware=HDMI-A-2:edid/edid.bin"
-    "video=HDMI-A-2:1920x1080@120"
+    "drm.edid_firmware=${cfg.monitor}:edid/edid.bin"
+    "video=${cfg.monitor}:1920x1080@120"
     "quiet"
     "splash"
     "intel_idle.max_cstate=1"
@@ -110,7 +111,7 @@ in
     useGlobalPkgs = true;
     useUserPackages = true;
     backupFileExtension = "bak"; 
-    users.remgr = { pkgs, inputs, ... }: {
+    users."${cfg.username}" = { pkgs, inputs, ... }: {
       imports = [ 
         spicetify-nix.homeManagerModules.default 
         ironbar-flake.homeManagerModules.default
@@ -176,11 +177,11 @@ in
       programs.git = {
         enable = true;
         settings.user = { 
-          name = "Zsombor Simon"; 
-          email = "zsombor@remgr.dev"; 
+          name = cfg.fullName; 
+          email = cfg.email; 
         };
         signing = {
-            key = "8D941BF242DA31D4";
+            key = cfg.gitSigningKey;
             signByDefault = true;
         };
       };
@@ -368,7 +369,7 @@ in
       };
       home.sessionPath = [ "$HOME/.npm-global/bin" ];
 
-      home.stateVersion = "26.05";
+      home.stateVersion = cfg.stateVersion;
     }; 
   };
 
@@ -380,7 +381,7 @@ in
   services.displayManager.sddm = {
     enable = true;
     wayland.enable = true;
-    theme = "/etc/sddm/themes/catppuccin-frappe-sapphire";
+    theme = "/etc/sddm/themes/${cfg.sddmTheme}";
   };
 
   services.greetd = {
@@ -388,7 +389,7 @@ in
     settings = {
       initial_session = {
         command = "niri-session";
-        user = "remgr";
+        user = cfg.username;
       };
       default_session = {
         command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd niri-session";
@@ -398,8 +399,8 @@ in
   };
   
   services.flatpak.enable = true;
-  time.timeZone = "Europe/Vienna";
-  i18n.defaultLocale = "en_US.UTF-8";
+  time.timeZone = cfg.timezone;
+  i18n.defaultLocale = cfg.locale;
 
   services.xserver.videoDrivers = [ "nvidia" ];
   
@@ -423,8 +424,8 @@ in
     prime = { 
       offload.enable = true; 
       offload.enableOffloadCmd = true; 
-      intelBusId = "PCI:0:2:0"; 
-      nvidiaBusId = "PCI:1:0:0"; 
+      intelBusId = cfg.intelBusId; 
+      nvidiaBusId = cfg.nvidiaBusId; 
     };
   };
 
@@ -497,9 +498,9 @@ in
         '';
       };
 
-  networking.hostName = "nixos";
+  networking.hostName = cfg.hostname;
   networking.networkmanager.enable = true;
-  networking.interfaces.enp3s0.useDHCP = true;
+  networking.interfaces."${cfg.networkInterface}".useDHCP = true;
   nixpkgs.config.allowUnfree = true;
 
   programs.zsh = {
@@ -507,7 +508,7 @@ in
     ohMyZsh = { enable = true; plugins = [ "git" ]; theme = "af-magic"; };
   };
 
-  users.users.remgr = {
+  users.users."${cfg.username}" = {
     isNormalUser = true;
     shell = pkgs.zsh;
     extraGroups = [ "networkmanager" "wheel" "video" "audio" "storage" ];
@@ -580,5 +581,6 @@ in
     Option "Coolbits" "28"
   ''; 
   
-  system.stateVersion = "26.05"; 
+  system.stateVersion = cfg.stateVersion; 
 }
+
