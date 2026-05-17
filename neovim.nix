@@ -75,7 +75,11 @@
       lsp = {
         enable = true;
         servers = {
-          rust_analyzer.enable = true;
+          rust_analyzer = {
+            enable = true;
+            installCargo = false;
+            installRustc = false;
+          };
           gopls.enable = true;
           jdtls.enable = true;
           kotlin_language_server.enable = true;
@@ -117,7 +121,9 @@
       
       neo-tree = {
         enable = true;
-        closeIfLastWindow = true;
+        settings = {
+          close_if_last_window = true;
+        };
       };
 
       conform-nvim = {

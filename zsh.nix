@@ -14,7 +14,7 @@
 
     shellAliases = {
       lsa = "ls -a";
-      rebuild = "sudo nixos-rebuild switch";
+      rebuild = "cd /etc/nixos && sudo nix flake update && sudo nixos-rebuild switch";
       con = "qs /etc/nixos/configuration.nix";
       gp = ''read "msg?Commit message: " && git add . && git commit -m "$msg" && git push'';
       nx = ''cd /etc/nixos/'';

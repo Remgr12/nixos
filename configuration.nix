@@ -18,6 +18,7 @@ in
 
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
+    auto-optimise-store = true;
   };
 
   boot.kernelParams = [ 
@@ -26,10 +27,19 @@ in
     "video=${cfg.monitor}:1920x1080@120"
     "quiet"
     "splash"
-    "intel_idle.max_cstate=1"
-    "pcie_aspm=off"
     "intel_pstate=passive"
   ];
+
+  systemd.services.nvidia-undervolt = {
+    description = "Lock NVIDIA GPU Clock to 1635MHz";
+    after = [ "display-manager.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${config.boot.kernelPackages.nvidia_x11.bin}/bin/nvidia-smi -lgc 1635,1635";
+      RemainAfterExit = true;
+    };
+  };
 
   boot.initrd.extraFiles = {
     "lib/firmware/edid/edid.bin".source = ./edid.bin;
@@ -41,7 +51,16 @@ in
 
   programs.coolercontrol.enable = true;
 
-  hardware.graphics.enable = true;
+  hardware.graphics = {
+    enable = true;
+    extraPackages = with pkgs; [
+      intel-media-driver
+      intel-vaapi-driver
+    ];
+  };
+
+  # BTRFS Optimization
+  fileSystems."/".options = [ "compress=zstd" "noatime" "discard=async" ];
 
   services.btrfs.autoScrub = {
     enable = true;
@@ -410,7 +429,6 @@ in
     __GLX_VENDOR_LIBRARY_NAME = "nvidia";
     NIXOS_OZONE_WL = "1";
     __GL_SYNC_TO_VBLANK = "0";
-    NIRI_DISABLE_SYNCOBJ = "1";
   };
 
   hardware.nvidia = {
@@ -430,10 +448,21 @@ in
   };
 
   powerManagement.cpuFreqGovernor = "performance";
+  hardware.cpu.intel.updateMicrocode = true;
 
   programs.gamemode.enable = true;
+  zramSwap = {
+    enable = true;
+    algorithm = "zstd";
+  };
 
-  boot.kernel.sysctl."kernel.sysrq" = 1;
+  boot.kernel.sysctl = {
+    "kernel.sysrq" = 1;
+    "vm.swappiness" = 10;
+    "vm.dirty_ratio" = 60;
+    "vm.dirty_background_ratio" = 2;
+    "kernel.nmi_watchdog" = 0;
+  };
 
   boot.kernelPackages = pkgs.linuxPackages_zen;
   
@@ -500,6 +529,7 @@ in
 
   networking.hostName = cfg.hostname;
   networking.networkmanager.enable = true;
+  networking.networkmanager.wifi.powersave = false;
   networking.interfaces."${cfg.networkInterface}".useDHCP = true;
   nixpkgs.config.allowUnfree = true;
 
@@ -523,7 +553,7 @@ in
     loupe mpv pavucontrol playerctl pciutils usbutils lm_sensors libfido2
     git micro ntfs3g glib sbctl oreo-cursors-plus fastfetch xwayland-satellite
     mcontrolcenter blueman btrfs-assistant cliphist pinentry-gnome3
-    libappindicator-gtk3 appimage-run
+    libappindicator-gtk3 appimage-run mangohud
 
     gawk
     file
@@ -552,14 +582,30 @@ in
     package = niri-flake.packages.${pkgs.stdenv.hostPlatform.system}.niri;
   };
 
+  security.rtkit.enable = true;
   services.pipewire = { 
     enable = true; 
     pulse.enable = true; 
     alsa.enable = true; 
     alsa.support32Bit = true; 
+    extraConfig.pipewire."92-low-latency" = {
+      "context.properties" = {
+        "default.clock.rate" = 48000;
+        "default.clock.quantum" = 1024;
+        "default.clock.min-quantum" = 32;
+        "default.clock.max-quantum" = 2048;
+      };
+    };
   };
 
   services.pcscd.enable = true;
+  services.dbus.implementation = "broker";
+  services.thermald.enable = true;
+  services.irqbalance.enable = true;
+  services.scx = {
+    enable = true;
+    scheduler = "scx_rustland";
+  };
   
   programs.gnupg.agent = {
     enable = true;
@@ -568,6 +614,8 @@ in
   };
 
   programs.ssh.startAgent = false;
+
+  services.journald.extraConfig = "SystemMaxUse=50M";
 
   services.undervolt = {
     enable = true;
@@ -583,4 +631,3 @@ in
   
   system.stateVersion = cfg.stateVersion; 
 }
-

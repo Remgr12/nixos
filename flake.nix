@@ -15,7 +15,7 @@
     };
 
     niri-flake = {
-      url = "github:remgr12/niri";
+      url = "github:remgr12/niri/main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

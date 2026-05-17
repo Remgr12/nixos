@@ -1,7 +1,7 @@
-{ config, pkgs, inputs, ... }:
+{ config, pkgs, inputs, osConfig, ... }:
 
 let
-  cfg = config.myOptions;
+  cfg = osConfig.myOptions;
   ironbar-flake = inputs.ironbar-flake;
 in
 {

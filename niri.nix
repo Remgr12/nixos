@@ -1,7 +1,7 @@
-{ config, ... }:
+{ config, osConfig, ... }:
 
 let
-  cfg = config.myOptions;
+  cfg = osConfig.myOptions;
 in
 {
   xdg.configFile."niri/config.kdl".text = ''
@@ -46,6 +46,7 @@ in
     layout {
         gaps 7
         center-focused-column "never"
+        //strata-gaps 0
 
         preset-column-widths {
             proportion 0.5
@@ -63,6 +64,11 @@ in
         border { off; }
     }
 
+    //debug { 
+    //   disable-cursor-plane
+    //   force-tearing
+    //}
+
     output "${cfg.monitor}" {
         mode "1920x1080@120.000"
         scale 1.0
@@ -78,6 +84,11 @@ in
         match {}
         geometry-corner-radius 0
         open-maximized true
+    }
+
+    window-rule {
+        match title="vkcube"
+        allow-tearing
     }
 
     window-rule {
@@ -99,21 +110,11 @@ in
         match app-id="cs2"
         allow-tearing
     }
-
+    
     window-rule {
-        match is-active=false
-        opacity 0.95
-    }
-
-    window-rule {
-        match is-active=true
-        opacity 0.95
-    }
-
-    window-rule {
-        match app-id="kitty"
-        open-maximized false
-        default-column-width { proportion 0.5; }
+    match app-id="gsr-ui"
+    open-floating true
+    default-column-width { proportion 0.5; }
     }
 
     window-rule {
@@ -121,6 +122,12 @@ in
         open-maximized false
         default-column-width { proportion 0.5; }
     }
+
+    window-rule {
+        match app-id="kitty"
+        open-maximized false
+        default-column-width { proportion 0.5; }
+    }    
 
     window-rule {
         match app-id="localsend_app"
