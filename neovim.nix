@@ -1,0 +1,131 @@
+{ pkgs, ... }:
+
+{
+  programs.neovim = {
+    enable = true;
+    defaultEditor = true;
+    extraPackages = with pkgs; [
+      git lua-language-server stylua ripgrep fd gcc
+    ];
+  };
+
+  xdg.configFile."nvim" = {
+    source = pkgs.fetchFromGitHub {
+      owner = "LazyVim";
+      repo = "starter";
+      rev = "main";
+      sha256 = "sha256-QrpnlDD4r1X4C8PqBhQ+S3ar5C+qDrU1Jm/lPqyMIFM=";
+    };
+    recursive = true;
+  };
+
+  xdg.configFile."nvim/lua/plugins/snacks.lua".text = ''
+    return {
+    	"folke/snacks.nvim",
+    	opts = {
+    		dashboard = {
+    			formats = {
+    				header = { "%s", align = "left" },
+    			},
+    
+    			preset = {
+    				header = [[
+                                ###                
+                     ::                    ###     
+                     ##                    #:#     
+                               :::    #            
+               :.:            ДДДДД            #.# 
+                #             :%%%:            ### 
+                    :     #                        
+                   .%.                    %%#      
+                              %%%         ::       
+                              :::                ]],
+    
+    				keys = {
+    					{ icon = " ", key = "w", desc = "Projects", action = ":lua Snacks.dashboard.pick('projects')" },
+    					{ icon = " ", key = "f", desc = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
+    					{ icon = " ", key = "n", desc = "New File", action = ":ene | startinsert" },
+    					{
+    						icon = " ",
+    						key = "r",
+    						desc = "Recent Files",
+    						action = ":lua Snacks.dashboard.pick('oldfiles')",
+    					},
+    					{
+    						icon = " ",
+    						key = "c",
+    						desc = "Config",
+    						action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})",
+    					},
+    					{ icon = " ", key = "S", desc = "Restore Session", section = "session" },
+    					{
+    						icon = "󰒲 ",
+    						key = "l",
+    						desc = "Lazy",
+    						action = ":Lazy",
+    						enabled = package.loaded.lazy ~= nil,
+    					},
+    					{ icon = " ", key = "e", desc = "Lazy Extras", action = ":LazyExtras" },
+    					{ icon = " ", key = "q", desc = "Quit", action = ":qa" },
+    				},
+    			},
+    			sections = {
+    				{ section = "header" },
+    				{ section = "keys", gap = 1, padding = 1 },
+    
+    				function()
+    					local width = math.floor(vim.o.columns * 0.4)
+    					width = math.max(20, math.min(width, 50))
+    
+    					return {
+    						pane = 2,
+    						section = "projects",
+    						icon = " ",
+    						title = "Repositories",
+    						indent = 2,
+    						padding = 1,
+    						limit = 6,
+    						width = width,
+    					}
+    				end,
+    
+    				function()
+    					local in_git = Snacks.git.get_root() ~= nil
+    					local cmds = {
+    						{
+    							title = "Notifications",
+    							cmd = "gh notify -s -a -n5",
+    							action = function()
+    								vim.ui.open("https://github.com/notifications")
+    							end,
+    							key = "n",
+    							icon = " ",
+    							height = 15,
+    							enabled = true,
+    						},
+    						{
+    							title = "Status",
+    							cmd = "gh status",
+    							icon = "",
+    							height = 5,
+    							enabled = true,
+    						},
+    					}
+    					return vim.tbl_map(function(cmd)
+    						return vim.tbl_extend("force", {
+    							pane = 2,
+    							section = "terminal",
+    							enabled = in_git,
+    							padding = 1,
+    							ttl = 5 * 60,
+    							indent = 3,
+    						}, cmd)
+    					end, cmds)
+    				end,
+    				{ section = "startup" },
+    			},
+    		},
+    	},
+    }
+  '';
+}
