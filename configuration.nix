@@ -303,7 +303,7 @@ in
         btop gemini-cli spicetify-cli protonplus
         zotero onlyoffice-desktopeditors vlc appflowy blanket
         stirling-pdf davinci-resolve networkmanagerapplet
-        awww waypaper
+        awww waypaper gale
 
         (pkgs.writeShellScriptBin "ironbar-swaync-toggle" ''
           ${pkgs.swaynotificationcenter}/bin/swaync-client -t -sw &

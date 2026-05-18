@@ -90,11 +90,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1778579999,
-        "narHash": "sha256-mSlALKURzExD5lOc/dHkn/MQOrGv/nVwKsdkHDnbu1A=",
+        "lastModified": 1779035399,
+        "narHash": "sha256-xdV42D4lufJbkfg9Zc3pxv18gHZaWGHDDb78lcgipts=",
         "owner": "JakeStanger",
         "repo": "ironbar",
-        "rev": "0e04c5816f50dc57b4e66dc92d28cb36907f37dd",
+        "rev": "2858a7ac7a0cbee79cf0435fb4b6e67368009ac9",
         "type": "github"
       },
       "original": {
