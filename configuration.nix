@@ -13,7 +13,6 @@ in
 {
   imports = [ 
     ./hardware-configuration.nix 
-   #<home-manager/nixos>  
   ];
 
   nix.settings = {
@@ -22,34 +21,13 @@ in
   };
 
   boot.kernelParams = [ 
-    "nvidia-drm.modeset=1" 
-    "drm.edid_firmware=${cfg.monitor}:edid/edid.bin"
-    "video=${cfg.monitor}:1920x1080@120"
     "quiet"
     "splash"
-    "intel_pstate=passive"
   ];
 
-  systemd.services.nvidia-undervolt = {
-    description = "Lock NVIDIA GPU Clock to 1635MHz";
-    after = [ "display-manager.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = "${config.boot.kernelPackages.nvidia_x11.bin}/bin/nvidia-smi -lgc 1635,1635";
-      RemainAfterExit = true;
-    };
-  };
-
-  boot.initrd.extraFiles = {
-    "lib/firmware/edid/edid.bin".source = ./edid.bin;
-  };
-  
   programs.steam.enable = true;
   
-  boot.initrd.kernelModules = [ "nvidia" "nvidia_modeset" "nvidia_uvm" "nvidia_drm" "msi-ec" ];
-
-  programs.coolercontrol.enable = true;
+  boot.initrd.kernelModules = [ "i915" ];
 
   hardware.graphics = {
     enable = true;
@@ -83,19 +61,6 @@ in
     };
   };
 
-  boot.kernelModules = [ "msi-ec" "ec_sys" ];
-  boot.extraModulePackages = [ config.boot.kernelPackages.msi-ec ];
-  boot.extraModprobeConfig = ''
-    options ec_sys write_support=1
-  '';
-
-  hardware.firmware = [
-    (pkgs.runCommand "custom-edid" {} ''
-      mkdir -p $out/lib/firmware/edid
-      cp ${./edid.bin} $out/lib/firmware/edid/edid.bin
-    '')
-  ];
-  
   hardware.bluetooth.enable = true;
   hardware.bluetooth.powerOnBoot = true;
   services.blueman.enable = true;
@@ -209,49 +174,30 @@ in
           enable = true;
           
           settings = {
-            # Core Settings
             hide_window_decorations = "yes";
             window_padding_width = 4;
             shell = "zsh";
             confirm_os_window_close = 0;
-      
-            # Theme: Nord
             foreground = "#D8DEE9";
             background = "#2E3440";
             selection_foreground = "#000000";
             selection_background = "#FFFACD";
             url_color = "#0087BD";
             cursor = "#81A1C1";
-      
-            # black
             color0 = "#3B4252";
             color8 = "#4C566A";
-      
-            # red
             color1 = "#BF616A";
             color9 = "#BF616A";
-      
-            # green
             color2 = "#A3BE8C";
             color10 = "#A3BE8C";
-      
-            # yellow
             color3 = "#EBCB8B";
             color11 = "#EBCB8B";
-      
-            # blue
             color4 = "#81A1C1";
             color12 = "#81A1C1";
-      
-            # magenta
             color5 = "#B48EAD";
             color13 = "#B48EAD";
-      
-            # cyan
             color6 = "#88C0D0";
             color14 = "#8FBCBB";
-      
-            # white
             color7 = "#E5E9F0";
             color15 = "#ECEFF4";
           };
@@ -303,7 +249,7 @@ in
         btop gemini-cli spicetify-cli protonplus
         zotero onlyoffice-desktopeditors vlc appflowy blanket
         stirling-pdf davinci-resolve networkmanagerapplet
-        awww waypaper gale
+        awww waypaper gale karere
 
         (pkgs.writeShellScriptBin "ironbar-swaync-toggle" ''
           ${pkgs.swaynotificationcenter}/bin/swaync-client -t -sw &
@@ -320,11 +266,8 @@ in
           echo "CPU Speed: ''${CPU_FREQ%.*} MHz"
         '')
         (pkgs.writeShellScriptBin "ironbar-gpu-details" ''
-          TEMP=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader 2>/dev/null || echo "N/A")
-          LOAD=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null || echo "N/A")
-          echo "Load: ''${LOAD}%  |  Temp: ''${TEMP}°C"
-          echo "--- Apps Using GPU ---"
-          nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader 2>/dev/null | ${pkgs.gawk}/bin/awk -F', ' '{print " • " $2 " (" $3 ")"}'
+          echo "GPU: Intel UHD Graphics 615"
+          echo "Load information disabled (Intel iGPU)"
         '')
         (pkgs.writeShellScriptBin "ironbar-storage-details" ''
           DISK_INFO=$(${pkgs.coreutils}/bin/df -h / | ${pkgs.coreutils}/bin/tail -n 1)
@@ -420,34 +363,13 @@ in
   services.flatpak.enable = true;
   time.timeZone = cfg.timezone;
   i18n.defaultLocale = cfg.locale;
-
-  services.xserver.videoDrivers = [ "nvidia" ];
   
   environment.sessionVariables = {
-    LIBVA_DRIVER_NAME = "nvidia";
-    GBM_BACKEND = "nvidia-drm";
-    __GLX_VENDOR_LIBRARY_NAME = "nvidia";
+    LIBVA_DRIVER_NAME = "iHD";
     NIXOS_OZONE_WL = "1";
-    __GL_SYNC_TO_VBLANK = "0";
   };
 
-  hardware.nvidia = {
-    modesetting.enable = true;
-    open = true;
-    nvidiaSettings = true;
-    nvidiaPersistenced = true;
-    powerManagement.enable = true;
-    powerManagement.finegrained = false;
-    package = config.boot.kernelPackages.nvidiaPackages.latest;
-    prime = { 
-      offload.enable = true; 
-      offload.enableOffloadCmd = true; 
-      intelBusId = cfg.intelBusId; 
-      nvidiaBusId = cfg.nvidiaBusId; 
-    };
-  };
-
-  powerManagement.cpuFreqGovernor = "performance";
+  powerManagement.cpuFreqGovernor = "powersave";
   hardware.cpu.intel.updateMicrocode = true;
 
   programs.gamemode.enable = true;
@@ -617,17 +539,5 @@ in
 
   services.journald.extraConfig = "SystemMaxUse=50M";
 
-  services.undervolt = {
-    enable = true;
-    coreOffset = -125;
-    uncoreOffset = -125;
-    gpuOffset = -6; 
-    temp = 90;
-  };
-
-  services.xserver.screenSection = ''
-    Option "Coolbits" "28"
-  ''; 
-  
   system.stateVersion = cfg.stateVersion; 
 }
