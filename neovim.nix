@@ -8,6 +8,7 @@
   programs.nixvim = {
     enable = true;
     defaultEditor = true;
+    nixpkgs.source = inputs.nixpkgs;
 
     globals = {
       mapleader = " ";
@@ -35,6 +36,7 @@
       shiftwidth = 2;
       fillchars = { eob = " "; };
       ruler = false;
+      clipboard = "unnamedplus"; # Syncs Neovim clipboard with system clipboard
     };
 
     # Custom Keymaps
@@ -141,12 +143,12 @@
           dashboard = {
             preset.header = ''
                         ###                 
-             ::                  ###     
-             ##                  #:#     
+             ::                 ###     
+             ##                 #:#     
                       :::    #            
-           :.:            ДДДДД             #.# 
+           :.:           ДДДДД             #.# 
             #             :%%%:             ### 
-                :     #                       
+                 :     #                       
                .%.                    %%#      
                              %%%          ::       
                              :::                

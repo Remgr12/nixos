@@ -9,6 +9,8 @@ let
   spicetify-nix = inputs.spicetify-nix;
   niri-flake    = inputs.niri-flake;
   ironbar-flake = inputs.ironbar-flake;
+  antigravity-nix = inputs.antigravity-nix;
+  llm-agents      = inputs.llm-agents;
 in
 {
   imports = [ 
@@ -16,10 +18,27 @@ in
    #<home-manager/nixos>  
   ];
 
-  nix.settings = {
-    experimental-features = [ "nix-command" "flakes" ];
-    auto-optimise-store = true;
+  nix = {
+    settings = {
+      experimental-features = [ "nix-command" "flakes" ];
+      auto-optimise-store = true;
+    };
+    # Automatic Garbage Collection Setup
+    gc = {
+      automatic = true;
+      dates = "weekly";
+      options = "--delete-older-than 7d";
+    };
   };
+
+  # Replace sudo with doas
+  security.sudo.enable = false;
+  security.doas.enable = true;
+  security.doas.extraRules = [{
+    users = [ "${cfg.username}" ];
+    keepEnv = true;
+    persist = true;
+  }];
 
   boot.kernelParams = [ 
     "nvidia-drm.modeset=1" 
@@ -131,6 +150,9 @@ in
     useUserPackages = true;
     backupFileExtension = "bak"; 
     users."${cfg.username}" = { pkgs, inputs, ... }: {
+      
+      _module.args = { inherit inputs; };
+
       imports = [ 
         spicetify-nix.homeManagerModules.default 
         ironbar-flake.homeManagerModules.default
@@ -138,6 +160,7 @@ in
         ./ironbar.nix
         ./niri.nix
         ./zsh.nix
+	./antigravity.nix
       ];
 
       systemd.user.services.swww = {
@@ -153,6 +176,18 @@ in
           Restart = "on-failure";
         };
         Install = { WantedBy = [ "graphical-session.target" ]; };
+      };
+
+      systemd.user.services.i2p = {
+        Unit = {
+          Description = "Java I2P Router";
+          After = [ "network.target" ];
+        };
+        Service = {
+          ExecStart = "${pkgs.i2p}/bin/i2prouter";
+          Restart = "on-failure";
+        };
+        Install = { WantedBy = [ "default.target" ]; };
       };
 
       systemd.user.services.swaync.Service.ExecStartPre = "${pkgs.coreutils}/bin/sleep 2";
@@ -298,12 +333,13 @@ in
         thunderbird strawberry goofcord kitty micro 
         prismlauncher weylus mullvad-vpn gh chromium 
         localsend libreoffice-fresh firefox swaynotificationcenter
-        rustup gcc gnumake ruby odin ols nodejs_20 wireplumber
+        rustup gcc gnumake ruby odin ols nodejs_26 wireplumber
         (python3.withPackages (ps: [ ps.pip ]))
         btop gemini-cli spicetify-cli protonplus
         zotero onlyoffice-desktopeditors vlc appflowy blanket
         stirling-pdf davinci-resolve networkmanagerapplet
         awww waypaper gale
+        i2p mullvad-browser
 
         (pkgs.writeShellScriptBin "ironbar-swaync-toggle" ''
           ${pkgs.swaynotificationcenter}/bin/swaync-client -t -sw &
