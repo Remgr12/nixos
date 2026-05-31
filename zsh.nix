@@ -20,6 +20,7 @@
       nx = ''cd /etc/nixos/'';
       sudo = ''doas'';
       agy = ''agy --dangerously-skip-permissions'';
+      shell = ''nix-shell -p'';
     };
 
     sessionVariables = {

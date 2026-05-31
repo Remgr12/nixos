@@ -160,7 +160,7 @@ in
         ./ironbar.nix
         ./niri.nix
         ./zsh.nix
-	./antigravity.nix
+    ./antigravity.nix
       ];
 
       systemd.user.services.swww = {
@@ -590,6 +590,8 @@ in
     git micro ntfs3g glib sbctl oreo-cursors-plus fastfetch xwayland-satellite
     mcontrolcenter blueman btrfs-assistant cliphist pinentry-gnome3
     libappindicator-gtk3 appimage-run mangohud
+    claude-code
+    mcp-nixos
 
     gawk
     file

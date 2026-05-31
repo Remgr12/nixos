@@ -24,41 +24,29 @@
       fd 
       gcc
       lazygit
-      wl-clipboard # For Wayland clipboard support
-      xclip        # For X11 clipboard support
+      wl-clipboard
+      xclip        
     ];
 
     # Core Options
     opts = {
-      termguicolors = false;
+      termguicolors = true;
       number = true;
       relativenumber = true;
       shiftwidth = 2;
       fillchars = { eob = " "; };
       ruler = false;
-      clipboard = "unnamedplus"; # Syncs Neovim clipboard with system clipboard
+      clipboard = "unnamedplus";
     };
 
-    # Custom Keymaps
+    # Custom Keymaps (LazyVim style)
     keymaps = [
-      {
-        mode = "n";
-        key = "<leader>gg";
-        action = "<cmd>lua Snacks.lazygit()<CR>";
-        options.desc = "Open LazyGit";
-      }
-      {
-        mode = "v";
-        key = "d";
-        action = "\"_d"; # Uses the blackhole register to delete without saving
-        options.desc = "Delete without yanking";
-      }
-      {
-        mode = "v";
-        key = "x";
-        action = "\"+d"; # Uses the + register to cut to the system clipboard
-        options.desc = "Cut to system clipboard";
-      }
+      { mode = "n"; key = "<leader>e"; action = "<cmd>Neotree toggle<CR>"; options.desc = "Explorer NeoTree"; }
+      { mode = "n"; key = "<leader><space>"; action = "<cmd>Telescope find_files<CR>"; options.desc = "Find Files"; }
+      { mode = "n"; key = "<leader>/"; action = "<cmd>Telescope live_grep<CR>"; options.desc = "Grep (Root Dir)"; }
+      { mode = "n"; key = "<leader>gg"; action = "<cmd>lua Snacks.lazygit()<CR>"; options.desc = "Open LazyGit"; }
+      { mode = "v"; key = "d"; action = "\"_d"; options.desc = "Delete without yanking"; }
+      { mode = "v"; key = "x"; action = "\"+d"; options.desc = "Cut to system clipboard"; }
     ];
 
     # Plugins
@@ -66,6 +54,27 @@
       web-devicons.enable = true;
       lualine.enable = true;
       telescope.enable = true;
+      
+      # LazyVim UI Additions
+      bufferline.enable = true;
+      noice.enable = true;
+      notify.enable = true;
+
+      # Auto-completion
+      cmp = {
+        enable = true;
+        settings = {
+          sources = [
+            { name = "nvim_lsp"; }
+            { name = "buffer"; }
+            { name = "path"; }
+          ];
+          mapping = {
+            "<CR>" = "cmp.mapping.confirm({ select = true })";
+            "<Tab>" = "cmp.mapping(cmp.mapping.select_next_item(), {'i', 's'})";
+          };
+        };
+      };
       
       # Syntax Highlighting
       treesitter = {
@@ -146,11 +155,11 @@
              ::                 ###     
              ##                 #:#     
                       :::    #            
-           :.:           ДДДДД             #.# 
+           :.:            ДДДДД            #.#  
             #             :%%%:             ### 
-                 :     #                       
-               .%.                    %%#      
-                             %%%          ::       
+                 :     #                        
+               .%.                    %%#       
+                             %%%          ::        
                              :::                
             '';
             sections = [
