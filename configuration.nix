@@ -55,7 +55,7 @@ in
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${config.boot.kernelPackages.nvidia_x11.bin}/bin/nvidia-smi -lgc 1635,1635";
+      ExecStart = "${config.hardware.nvidia.package.bin}/bin/nvidia-smi -lgc 1635,1635";
       RemainAfterExit = true;
     };
   };
@@ -153,14 +153,15 @@ in
       
       _module.args = { inherit inputs; };
 
-      imports = [ 
-        spicetify-nix.homeManagerModules.default 
+      imports = [
+        spicetify-nix.homeManagerModules.default
         ironbar-flake.homeManagerModules.default
         ./neovim.nix
         ./ironbar.nix
         ./niri.nix
         ./zsh.nix
-    ./antigravity.nix
+        ./antigravity.nix
+        ./aurora-mpris.nix
       ];
 
       systemd.user.services.swww = {
@@ -337,9 +338,10 @@ in
         (python3.withPackages (ps: [ ps.pip ]))
         btop gemini-cli spicetify-cli protonplus
         zotero onlyoffice-desktopeditors vlc appflowy blanket
+        khal vdirsyncer
         stirling-pdf davinci-resolve networkmanagerapplet
-        awww waypaper gale
-        i2p mullvad-browser
+        awww waypaper gale fzf teams-for-linux
+        i2p mullvad-browser avahi  
 
         (pkgs.writeShellScriptBin "ironbar-swaync-toggle" ''
           ${pkgs.swaynotificationcenter}/bin/swaync-client -t -sw &
@@ -400,20 +402,128 @@ in
           if [ -n "$DEV" ]; then
             echo "󰋋 ''${DEV}"
           else
-            echo ""
+            echo "󰂯"
+          fi
+        '')
+        (pkgs.writeShellScriptBin "ironbar-blueman" ''
+          ${pkgs.blueman}/bin/blueman-manager &
+        '')
+        # Connection status shown inside the bluetooth popup.
+        (pkgs.writeShellScriptBin "ironbar-bt-status" ''
+          BT=${pkgs.bluez}/bin/bluetoothctl
+          if $BT show 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "Powered: yes"; then
+            OUT="Bluetooth: On\n\n"
+          else
+            OUT="Bluetooth: Off\n\n"
+          fi
+          OUT="$OUT""Connected:\n"
+          CONN=$($BT devices Connected 2>/dev/null | ${pkgs.gnused}/bin/sed -E 's/^Device [0-9A-F:]+ /  • /')
+          if [ -n "$CONN" ]; then OUT="$OUT$CONN\n"; else OUT="$OUT  (none)\n"; fi
+          OUT="$OUT""\nPaired:\n"
+          PAIRED=$($BT devices Paired 2>/dev/null | ${pkgs.gnused}/bin/sed -E 's/^Device [0-9A-F:]+ /  • /')
+          if [ -n "$PAIRED" ]; then OUT="$OUT$PAIRED\n"; else OUT="$OUT  (none)\n"; fi
+          ${pkgs.coreutils}/bin/printf '%b' "$OUT" | ${pkgs.gnused}/bin/sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
+        '')
+        # Toggle the adapter power on/off.
+        (pkgs.writeShellScriptBin "ironbar-bt-toggle" ''
+          BT=${pkgs.bluez}/bin/bluetoothctl
+          if $BT show 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "Powered: yes"; then
+            $BT power off >/dev/null 2>&1
+            ${pkgs.libnotify}/bin/notify-send "Bluetooth" "Powered off"
+          else
+            $BT power on >/dev/null 2>&1
+            ${pkgs.libnotify}/bin/notify-send "Bluetooth" "Powered on"
+          fi
+        '')
+        # Fuzzel chooser: lists known devices for quick connect/disconnect, with
+        # an option to scan for new devices to pair. Selecting a device toggles
+        # its connection; an unpaired device is paired + trusted + connected.
+        (pkgs.writeShellScriptBin "ironbar-bt-menu" ''
+          BT=${pkgs.bluez}/bin/bluetoothctl
+          FUZZEL=${pkgs.fuzzel}/bin/fuzzel
+          NOTIFY=${pkgs.libnotify}/bin/notify-send
+          TMP=$(${pkgs.coreutils}/bin/mktemp)
+          SCAN_LABEL="⟳  Scan for new devices…"
+
+          $BT power on >/dev/null 2>&1
+
+          list_to_file() {
+            : > "$TMP"
+            $BT devices 2>/dev/null | while read -r _ mac name; do
+              [ -z "$mac" ] && continue
+              info=$($BT info "$mac" 2>/dev/null)
+              if ${pkgs.coreutils}/bin/printf '%s' "$info" | ${pkgs.gnugrep}/bin/grep -q "Connected: yes"; then
+                ${pkgs.coreutils}/bin/printf '%s\t✓  %s  (connected)\n' "$mac" "$name" >> "$TMP"
+              elif ${pkgs.coreutils}/bin/printf '%s' "$info" | ${pkgs.gnugrep}/bin/grep -q "Paired: yes"; then
+                ${pkgs.coreutils}/bin/printf '%s\t•  %s\n' "$mac" "$name" >> "$TMP"
+              else
+                ${pkgs.coreutils}/bin/printf '%s\t+  %s  (new)\n' "$mac" "$name" >> "$TMP"
+              fi
+            done
+          }
+
+          show_menu() {
+            { ${pkgs.coreutils}/bin/printf '%s\n' "$SCAN_LABEL"; ${pkgs.coreutils}/bin/cut -f2- "$TMP"; } \
+              | $FUZZEL --dmenu --prompt "Bluetooth  "
+          }
+
+          list_to_file
+          CHOICE=$(show_menu)
+          if [ "$CHOICE" = "$SCAN_LABEL" ]; then
+            $NOTIFY "Bluetooth" "Scanning…"
+            $BT --timeout 6 scan on >/dev/null 2>&1
+            list_to_file
+            CHOICE=$(show_menu)
+          fi
+
+          if [ -z "$CHOICE" ] || [ "$CHOICE" = "$SCAN_LABEL" ]; then ${pkgs.coreutils}/bin/rm -f "$TMP"; exit 0; fi
+          MAC=$(${pkgs.gawk}/bin/awk -F'\t' -v c="$CHOICE" '$2==c{print $1; exit}' "$TMP")
+          ${pkgs.coreutils}/bin/rm -f "$TMP"
+          [ -z "$MAC" ] && exit 0
+
+          info=$($BT info "$MAC" 2>/dev/null)
+          if ${pkgs.coreutils}/bin/printf '%s' "$info" | ${pkgs.gnugrep}/bin/grep -q "Connected: yes"; then
+            $BT disconnect "$MAC" >/dev/null 2>&1 && $NOTIFY "Bluetooth" "Disconnected"
+          elif ${pkgs.coreutils}/bin/printf '%s' "$info" | ${pkgs.gnugrep}/bin/grep -q "Paired: yes"; then
+            $BT connect "$MAC" >/dev/null 2>&1 && $NOTIFY "Bluetooth" "Connected" || $NOTIFY "Bluetooth" "Connection failed"
+          else
+            $NOTIFY "Bluetooth" "Pairing…"
+            $BT pair "$MAC" >/dev/null 2>&1
+            $BT trust "$MAC" >/dev/null 2>&1
+            if $BT connect "$MAC" >/dev/null 2>&1; then $NOTIFY "Bluetooth" "Paired & connected"; else $NOTIFY "Bluetooth" "Pairing failed"; fi
           fi
         '')
         (pkgs.writeShellScriptBin "ironbar-swaync" ''
           COUNT=$(${pkgs.swaynotificationcenter}/bin/swaync-client -c 2>/dev/null || echo 0)
           DND=$(${pkgs.swaynotificationcenter}/bin/swaync-client -D 2>/dev/null || echo "false")
           if [ "$COUNT" = "" ]; then COUNT=0; fi
-          
+
           if [ "$DND" = "true" ]; then
             echo "󰂛 $COUNT"
           elif [ "$COUNT" -gt 0 ]; then
             echo "󱅫 $COUNT"
           else
             echo "󰂚 "
+          fi
+        '')
+        (pkgs.writeShellScriptBin "ironbar-swaync-icon" ''
+          COUNT=$(${pkgs.swaynotificationcenter}/bin/swaync-client -c 2>/dev/null || echo 0)
+          DND=$(${pkgs.swaynotificationcenter}/bin/swaync-client -D 2>/dev/null || echo "false")
+          if [ "$COUNT" = "" ]; then COUNT=0; fi
+
+          if [ "$DND" = "true" ]; then
+            echo "󰂛"
+          elif [ "$COUNT" -gt 0 ]; then
+            echo "󱅫"
+          else
+            echo "󰂚"
+          fi
+        '')
+        (pkgs.writeShellScriptBin "ironbar-swaync-count" ''
+          COUNT=$(${pkgs.swaynotificationcenter}/bin/swaync-client -c 2>/dev/null || echo 0)
+          if [ "$COUNT" = "" ]; then COUNT=0; fi
+          if [ "$COUNT" -gt 0 ]; then
+            echo "$COUNT"
           fi
         '')
       ];
@@ -424,8 +534,70 @@ in
       };
       home.sessionPath = [ "$HOME/.npm-global/bin" ];
 
+      xdg.configFile."khal/config".text = ''
+        [calendars]
+        [[default]]
+        path = ~/.local/share/khal/calendars/
+        color = cyan
+
+        [sqlite]
+        path = ~/.local/share/khal/khal.db
+
+        [locale]
+        timeformat = %H:%M
+        dateformat = %d/%m/%Y
+        datetimeformat = %d/%m/%Y %H:%M
+        firstweekday = 0
+      '';
+
+      xdg.configFile."vdirsyncer/config".text = ''
+        [general]
+        status_path = "~/.local/share/vdirsyncer/status/"
+
+        # Uncomment and fill in to add a remote calendar, then run:
+        #   vdirsyncer discover && vdirsyncer sync
+
+        # [pair personal_calendar]
+        # a = "personal_local"
+        # b = "personal_remote"
+        # collections = ["from a", "from b"]
+
+        # [storage personal_local]
+        # type = "filesystem"
+        # path = "~/.local/share/khal/calendars/"
+        # fileext = ".ics"
+
+        # [storage personal_remote]
+        # type = "caldav"
+        # url = "https://YOUR_CALDAV_SERVER/calendars/USERNAME/"
+        # username = "USERNAME"
+        # password = "PASSWORD"
+
+        # Google Calendar (read-only iCal):
+        # type = "http"
+        # url = "https://calendar.google.com/calendar/ical/YOUR_ID/basic.ics"
+      '';
+
+      systemd.user.services.vdirsyncer = {
+        Unit.Description = "vdirsyncer calendar sync";
+        Service = {
+          Type = "oneshot";
+          ExecStart = "${pkgs.vdirsyncer}/bin/vdirsyncer sync";
+        };
+      };
+
+      systemd.user.timers.vdirsyncer = {
+        Unit.Description = "vdirsyncer calendar sync timer";
+        Timer = {
+          OnBootSec = "2min";
+          OnUnitActiveSec = "30min";
+          Persistent = true;
+        };
+        Install.WantedBy = [ "timers.target" ];
+      };
+
       home.stateVersion = cfg.stateVersion;
-    }; 
+    };
   };
 
   programs.gamescope = {
@@ -577,7 +749,7 @@ in
   users.users."${cfg.username}" = {
     isNormalUser = true;
     shell = pkgs.zsh;
-    extraGroups = [ "networkmanager" "wheel" "video" "audio" "storage" ];
+    extraGroups = [ "networkmanager" "wheel" "video" "audio" "storage" "lp" "scanner" ];
   };
 
   environment.systemPackages = with pkgs; [
@@ -589,6 +761,7 @@ in
     loupe mpv pavucontrol playerctl pciutils usbutils lm_sensors libfido2
     git micro ntfs3g glib sbctl oreo-cursors-plus fastfetch xwayland-satellite
     mcontrolcenter blueman btrfs-assistant cliphist pinentry-gnome3
+    system-config-printer
     libappindicator-gtk3 appimage-run mangohud
     claude-code
     mcp-nixos
@@ -633,6 +806,36 @@ in
         "default.clock.min-quantum" = 32;
         "default.clock.max-quantum" = 2048;
       };
+    };
+    # Automatically make a newly connected device the default sink/source.
+    # This is what flips audio to a bluetooth headset/speaker the moment it
+    # connects (and back to built-in when it disconnects).
+    extraConfig.pipewire-pulse."20-switch-on-connect" = {
+      "pulse.cmd" = [
+        { cmd = "load-module"; args = "module-switch-on-connect"; flags = [ ]; }
+      ];
+    };
+  };
+
+  services.printing = {
+    enable = true;
+    drivers = with pkgs; [
+      gutenprint
+      gutenprintBin
+      hplip
+      cups-filters
+      epson-escpr
+      brlaser
+    ];
+  };
+
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    openFirewall = true;
+    publish = {
+      enable = true;
+      userServices = true;	
     };
   };
 

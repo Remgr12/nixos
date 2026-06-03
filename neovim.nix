@@ -30,7 +30,7 @@
 
     # Core Options
     opts = {
-      termguicolors = true;
+      termguicolors = false;
       number = true;
       relativenumber = true;
       shiftwidth = 2;
@@ -56,7 +56,7 @@
       telescope.enable = true;
       
       # LazyVim UI Additions
-      bufferline.enable = true;
+      bufferline.enable = false;
       noice.enable = true;
       notify.enable = true;
 
@@ -71,7 +71,8 @@
           ];
           mapping = {
             "<CR>" = "cmp.mapping.confirm({ select = true })";
-            "<Tab>" = "cmp.mapping(cmp.mapping.select_next_item(), {'i', 's'})";
+            "<C-n>" = "cmp.mapping(cmp.mapping.select_next_item(), {'i', 's'})";
+            "<C-p>" = "cmp.mapping(cmp.mapping.select_prev_item(), {'i', 's'})";
           };
         };
       };
@@ -114,7 +115,15 @@
       copilot-lua = {
         enable = true;
         settings = {
-          suggestion.auto_trigger = true;
+          suggestion = {
+            auto_trigger = true;
+            keymap = {
+              accept = "<Tab>";
+              next = "`";
+              prev = "<M-[>";
+              dismiss = "<C-]>";
+            };
+          };
           panel.enabled = false;
         };
       };
@@ -155,12 +164,12 @@
              ::                 ###     
              ##                 #:#     
                       :::    #            
-           :.:            ДДДДД            #.#  
+           :.:         ДДДДД            #.#  
             #             :%%%:             ### 
                  :     #                        
                .%.                    %%#       
-                             %%%          ::        
-                             :::                
+                                 %%%          ::        
+                                 :::                
             '';
             sections = [
               { section = "header"; }

@@ -21,6 +21,7 @@
       sudo = ''doas'';
       agy = ''agy --dangerously-skip-permissions'';
       shell = ''nix-shell -p'';
+      cl = ''claude --dangerously-skip-permissions'';
     };
 
     sessionVariables = {
@@ -29,6 +30,8 @@
     };
 
     initContent = ''
+      unsetopt BEEP
+
       # Custom Functions
       qs() { micro "$@" }
 
