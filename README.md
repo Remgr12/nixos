@@ -35,3 +35,6 @@ Alternatively, use the provided alias if you are using the Zsh configuration:
 ```bash
 rebuild
 ```
+
+## Credits
+- **Aurora-Shell**: Credits to Spn4x (https://github.com/Spn4x/Aurora-Shell) for the music player
