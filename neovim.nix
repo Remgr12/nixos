@@ -185,7 +185,7 @@
                         title = "Notifications",
                         cmd = "gh notify -s -a -n5",
                         action = function() vim.ui.open("https://github.com/notifications") end,
-                        key = "n", icon = " ", height = 15, enabled = true,
+                        key = "u", icon = " ", height = 15, enabled = true,
                       },
                       {
                         title = "Status", cmd = "gh status", icon = "", height = 5, enabled = true,

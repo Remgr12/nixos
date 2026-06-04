@@ -43,6 +43,8 @@
       url = "github:Spn4x/Aurora-Shell";
       flake = false;
     };
+
+    crane.url = "github:ipetkov/crane";
   };
 
   outputs = { self, nixpkgs, home-manager, ... }@inputs: {

@@ -22,6 +22,18 @@ in
     settings = {
       experimental-features = [ "nix-command" "flakes" ];
       auto-optimise-store = true;
+      max-jobs = "auto";
+      cores = 0;
+      substituters = [
+        "https://cache.nixos.org"
+        "https://nix-community.cachix.org"
+        "https://cache.garnix.io"
+      ];
+      trusted-public-keys = [
+        "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+        "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+        "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
+      ];
     };
     # Automatic Garbage Collection Setup
     gc = {
@@ -75,6 +87,7 @@ in
     extraPackages = with pkgs; [
       intel-media-driver
       intel-vaapi-driver
+      nvidia-vaapi-driver
     ];
   };
 
@@ -86,6 +99,10 @@ in
     interval = "weekly"; 
     fileSystems = [ "/" ];
   };
+
+  systemd.tmpfiles.rules = [
+    "d /home/.snapshots 0750 root root -"
+  ];
 
   services.snapper = {
     configs = {
@@ -341,7 +358,7 @@ in
         khal vdirsyncer
         stirling-pdf davinci-resolve networkmanagerapplet
         awww waypaper gale fzf teams-for-linux
-        i2p mullvad-browser avahi  
+        i2p mullvad-browser avahi wayvr xdg-desktop-portal-gnome 
 
         (pkgs.writeShellScriptBin "ironbar-swaync-toggle" ''
           ${pkgs.swaynotificationcenter}/bin/swaync-client -t -sw &
@@ -528,6 +545,14 @@ in
         '')
       ];
 
+      home.file.".cargo/config.toml".text = ''
+        [build]
+        rustc-wrapper = "${pkgs.sccache}/bin/sccache"
+
+        [target.x86_64-unknown-linux-gnu]
+        rustflags = ["-C", "link-arg=-fuse-ld=${pkgs.mold}/bin/mold"]
+      '';
+
       home.sessionVariables = {
         NPM_CONFIG_PREFIX = "$HOME/.npm-global";
         GTK_CSD = "0"; 
@@ -626,6 +651,7 @@ in
   };
   
   services.flatpak.enable = true;
+
   time.timeZone = cfg.timezone;
   i18n.defaultLocale = cfg.locale;
 
@@ -637,6 +663,7 @@ in
     __GLX_VENDOR_LIBRARY_NAME = "nvidia";
     NIXOS_OZONE_WL = "1";
     __GL_SYNC_TO_VBLANK = "0";
+    NVD_BACKEND = "direct";
   };
 
   hardware.nvidia = {
@@ -739,6 +766,8 @@ in
   networking.networkmanager.enable = true;
   networking.networkmanager.wifi.powersave = false;
   networking.interfaces."${cfg.networkInterface}".useDHCP = true;
+  networking.firewall.allowedTCPPorts = [ 5353 9757 ];
+  networking.firewall.allowedUDPPorts = [ 5353 9757 ];
   nixpkgs.config.allowUnfree = true;
 
   programs.zsh = {
@@ -761,8 +790,9 @@ in
     loupe mpv pavucontrol playerctl pciutils usbutils lm_sensors libfido2
     git micro ntfs3g glib sbctl oreo-cursors-plus fastfetch xwayland-satellite
     mcontrolcenter blueman btrfs-assistant cliphist pinentry-gnome3
+    mold sccache
     system-config-printer
-    libappindicator-gtk3 appimage-run mangohud
+    libappindicator-gtk3 appimage-run mangohud ffmpeg
     claude-code
     mcp-nixos
 
@@ -779,6 +809,7 @@ in
     '')
   ];
 
+  programs.ccache.enable = true;
   programs.nix-ld.enable = true;
 
   hardware.enableAllFirmware = true;
@@ -835,7 +866,7 @@ in
     openFirewall = true;
     publish = {
       enable = true;
-      userServices = true;	
+      userServices = true;    
     };
   };
 
