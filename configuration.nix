@@ -8,7 +8,7 @@ let
   
   spicetify-nix = inputs.spicetify-nix;
   niri-flake    = inputs.niri-flake;
-  ironbar-flake = inputs.ironbar-flake;
+  noctalia-shell = inputs.noctalia-shell;
   antigravity-nix = inputs.antigravity-nix;
   llm-agents      = inputs.llm-agents;
 in
@@ -28,11 +28,13 @@ in
         "https://cache.nixos.org"
         "https://nix-community.cachix.org"
         "https://cache.garnix.io"
+        "https://noctalia.cachix.org"
       ];
       trusted-public-keys = [
         "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
         "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
         "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
+        "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
       ];
     };
     # Automatic Garbage Collection Setup
@@ -172,30 +174,14 @@ in
 
       imports = [
         spicetify-nix.homeManagerModules.default
-        ironbar-flake.homeManagerModules.default
+        noctalia-shell.homeModules.default
         ./neovim.nix
-        ./ironbar.nix
         ./copyq.nix
         ./niri.nix
         ./zsh.nix
         ./antigravity.nix
         ./aurora-mpris.nix
       ];
-
-      systemd.user.services.swww = {
-        Unit = {
-          Description = "Efficient animated wallpaper daemon for Wayland";
-          PartOf = [ "graphical-session.target" ];
-          After = [ "graphical-session.target" ];
-        };
-        Service = {
-          ExecStartPre = "${pkgs.coreutils}/bin/sleep 1";
-          ExecStart = "${pkgs.awww}/bin/awww-daemon";
-          ExecStop = "${pkgs.awww}/bin/awww kill";
-          Restart = "on-failure";
-        };
-        Install = { WantedBy = [ "graphical-session.target" ]; };
-      };
 
       systemd.user.services.i2p = {
         Unit = {
@@ -209,43 +195,22 @@ in
         Install = { WantedBy = [ "default.target" ]; };
       };
 
-      systemd.user.services.swaync.Service.ExecStartPre = "${pkgs.coreutils}/bin/sleep 2";
-
-      services.swaync = {
+      programs.noctalia = {
         enable = true;
+        systemd.enable = true;
         settings = {
-          positionX = "right";
-          positionY = "top";
-          layer = "overlay";
-          control-center-layer = "overlay";
-          control-center-margin-top = 10;
-          control-center-margin-bottom = 10;
-          control-center-margin-right = 10;
-          control-center-margin-left = 10;
-          timeout-low = 3;
-          timeout = 3;
-          timeout-critical = 3;
-          notification-window-width = 500;
-          keyboard-shortcuts = true;
-          image-visibility = "when-available";
-          transition-time = 200;
-          hide-on-clear = false;
-          hide-on-action = true;
+          shell.font = "JetBrainsMono Nerd Font";
+          theme = {
+            mode = "dark";
+            source = "builtin";
+            builtin = "Nord";
+          };
+          wallpaper = {
+            enabled = true;
+            default.path = "/etc/nixos/nord.jpg";
+          };
         };
-        style = ''
-          * { font-family: JetBrainsMono Nerd Font, sans-serif; }
-          .control-center { background: #2E3440; color: #D8DEE9; border: 2px solid #4C566A; border-radius: 8px; }
-          .notification { background: #3B4252; border: 1px solid #4C566A; border-radius: 4px; padding: 4px; margin: 2px 4px; box-shadow: none; }
-          .notification-content { padding: 4px; }
-          .summary { font-size: 13px; font-weight: bold; color: #D8DEE9; margin-bottom: 2px; }
-          .body { font-size: 12px; color: #E5E9F0; }
-          .close-button { background: #BF616A; color: #2E3440; border-radius: 4px; padding: 2px; margin: 2px; }
-          .close-button:hover { background: #D08770; }
-          .widget-title { color: #88C0D0; font-size: 14px; font-weight: bold; padding: 8px; margin: 4px; }
-          button { background: #4C566A; color: #D8DEE9; border-radius: 4px; padding: 4px; margin: 4px; border: none; }
-          button:hover { background: #88C0D0; color: #2E3440; }
-        '';
-      };        
+      };
 
       programs.git = {
         enable = true;
@@ -349,17 +314,17 @@ in
       dconf.settings."org/gnome/desktop/interface".color-scheme = "prefer-dark";
 
       home.packages = with pkgs; [
-        thunderbird strawberry goofcord kitty micro 
-        prismlauncher weylus mullvad-vpn gh chromium 
-        localsend libreoffice-fresh firefox swaynotificationcenter
+        thunderbird strawberry goofcord kitty micro
+        prismlauncher weylus mullvad-vpn gh chromium
+        localsend libreoffice-fresh firefox
         rustup gcc gnumake ruby odin ols nodejs_26 wireplumber
         (python3.withPackages (ps: [ ps.pip ]))
         btop gemini-cli spicetify-cli protonplus
         zotero onlyoffice-desktopeditors vlc appflowy blanket
         khal vdirsyncer telegram-desktop
         stirling-pdf davinci-resolve networkmanagerapplet
-        awww waypaper gale fzf teams-for-linux
-        i2p mullvad-browser avahi wayvr xdg-desktop-portal-gnome 
+        gale fzf teams-for-linux
+        i2p mullvad-browser avahi wayvr xdg-desktop-portal-gnome
       ];
 
       home.file.".cargo/config.toml".text = ''
@@ -612,7 +577,7 @@ in
     system-config-printer
     libappindicator-gtk3 appimage-run mangohud ffmpeg
     claude-code
-    mcp-nixos
+    mcp-nixos lsfg-vk lsfg-vk-ui
 
     gawk
     file

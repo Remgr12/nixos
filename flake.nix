@@ -19,9 +19,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    ironbar-flake = {
-      url = "github:JakeStanger/ironbar";
-      inputs.nixpkgs.follows = "nixpkgs";
+    noctalia-shell = {
+      url = "github:noctalia-dev/noctalia-shell/v5";
     };
 
     nixvim = {
