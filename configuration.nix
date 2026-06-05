@@ -175,6 +175,7 @@ in
         ironbar-flake.homeManagerModules.default
         ./neovim.nix
         ./ironbar.nix
+        ./copyq.nix
         ./niri.nix
         ./zsh.nix
         ./antigravity.nix
@@ -355,194 +356,10 @@ in
         (python3.withPackages (ps: [ ps.pip ]))
         btop gemini-cli spicetify-cli protonplus
         zotero onlyoffice-desktopeditors vlc appflowy blanket
-        khal vdirsyncer
+        khal vdirsyncer telegram-desktop
         stirling-pdf davinci-resolve networkmanagerapplet
         awww waypaper gale fzf teams-for-linux
         i2p mullvad-browser avahi wayvr xdg-desktop-portal-gnome 
-
-        (pkgs.writeShellScriptBin "ironbar-swaync-toggle" ''
-          ${pkgs.swaynotificationcenter}/bin/swaync-client -t -sw &
-        '')
-        (pkgs.writeShellScriptBin "ironbar-swaync-dnd" ''
-          ${pkgs.swaynotificationcenter}/bin/swaync-client -d &
-        '')
-
-        (pkgs.writeShellScriptBin "ironbar-sys-details" ''
-          CPU_TEMP=$(${pkgs.lm_sensors}/bin/sensors | ${pkgs.gnugrep}/bin/grep "Package id 0:" | ${pkgs.gawk}/bin/awk '{print $4}')
-          CPU_FREQ=$(${pkgs.coreutils}/bin/cat /proc/cpuinfo | ${pkgs.gnugrep}/bin/grep "cpu MHz" | ${pkgs.coreutils}/bin/head -n1 | ${pkgs.gawk}/bin/awk '{print $4}')
-          
-          echo "CPU Temp: $CPU_TEMP"
-          echo "CPU Speed: ''${CPU_FREQ%.*} MHz"
-        '')
-        (pkgs.writeShellScriptBin "ironbar-gpu-details" ''
-          TEMP=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader 2>/dev/null || echo "N/A")
-          LOAD=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null || echo "N/A")
-          echo "Load: ''${LOAD}%  |  Temp: ''${TEMP}°C"
-          echo "--- Apps Using GPU ---"
-          nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader 2>/dev/null | ${pkgs.gawk}/bin/awk -F', ' '{print " • " $2 " (" $3 ")"}'
-        '')
-        (pkgs.writeShellScriptBin "ironbar-storage-details" ''
-          DISK_INFO=$(${pkgs.coreutils}/bin/df -h / | ${pkgs.coreutils}/bin/tail -n 1)
-          SIZE=$(echo "$DISK_INFO" | ${pkgs.gawk}/bin/awk '{print $2}')
-          USED=$(echo "$DISK_INFO" | ${pkgs.gawk}/bin/awk '{print $3}')
-          AVAIL=$(echo "$DISK_INFO" | ${pkgs.gawk}/bin/awk '{print $4}')
-          USE_PERC=$(echo "$DISK_INFO" | ${pkgs.gawk}/bin/awk '{print $5}')
-          echo "Root Partition (/):"
-          echo "Total: $SIZE | Used: $USED ($USE_PERC) | Free: $AVAIL"
-          echo ""
-          echo "RAM Status:"
-          ${pkgs.procps}/bin/free -h | ${pkgs.gnugrep}/bin/grep "Mem:" | ${pkgs.gawk}/bin/awk '{print "Total: " $2 " | Used: " $3 " | Free: " $4}'
-        '')
-        (pkgs.writeShellScriptBin "ironbar-services" ''
-          echo "Main Services Status:"
-          systemctl --user is-active ironbar awww swaync | ${pkgs.gawk}/bin/awk 'BEGIN {a[0]="ironbar"; a[1]="swaybg"; a[2]="swaync"} {print a[NR-1] ": " $0}'
-          echo ""
-          echo "System Load: $(${pkgs.coreutils}/bin/uptime | ${pkgs.gawk}/bin/awk -F'load average:' '{ print $2 }')"
-        '')
-        (pkgs.writeShellScriptBin "ironbar-music" ''
-          STATUS=$(${pkgs.playerctl}/bin/playerctl status 2>/dev/null)
-          if [ "$STATUS" = "Playing" ] || [ "$STATUS" = "Paused" ]; then
-              ARTIST=$(${pkgs.playerctl}/bin/playerctl metadata artist)
-              TITLE=$(${pkgs.playerctl}/bin/playerctl metadata title)
-              echo "  󰎆 ''${TITLE} - ''${ARTIST}  "
-          else
-              echo ""
-          fi
-        '')
-        (pkgs.writeShellScriptBin "ironbar-audio" ''
-          VOL=$(${pkgs.pulseaudio}/bin/pactl get-sink-volume @DEFAULT_SINK@ | ${pkgs.gnugrep}/bin/grep -o '[0-9]*%' | ${pkgs.coreutils}/bin/head -n1)
-          MIC=$(${pkgs.pulseaudio}/bin/pactl get-source-volume @DEFAULT_SOURCE@ | ${pkgs.gnugrep}/bin/grep -o '[0-9]*%' | ${pkgs.coreutils}/bin/head -n1)
-          echo "  󰕾 ''${VOL}   ''${MIC}  "
-        '')
-        (pkgs.writeShellScriptBin "ironbar-bluetooth" ''
-          DEV=$(${pkgs.wireplumber}/bin/wpctl status | ${pkgs.gnugrep}/bin/grep -i 'bluez' | ${pkgs.coreutils}/bin/head -n1 | ${pkgs.gnused}/bin/sed -E 's/.*[0-9]+\.\s*(.*)\s*\[.*/\1/')
-          if [ -n "$DEV" ]; then
-            echo "󰋋 ''${DEV}"
-          else
-            echo "󰂯"
-          fi
-        '')
-        (pkgs.writeShellScriptBin "ironbar-blueman" ''
-          ${pkgs.blueman}/bin/blueman-manager &
-        '')
-        # Connection status shown inside the bluetooth popup.
-        (pkgs.writeShellScriptBin "ironbar-bt-status" ''
-          BT=${pkgs.bluez}/bin/bluetoothctl
-          if $BT show 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "Powered: yes"; then
-            OUT="Bluetooth: On\n\n"
-          else
-            OUT="Bluetooth: Off\n\n"
-          fi
-          OUT="$OUT""Connected:\n"
-          CONN=$($BT devices Connected 2>/dev/null | ${pkgs.gnused}/bin/sed -E 's/^Device [0-9A-F:]+ /  • /')
-          if [ -n "$CONN" ]; then OUT="$OUT$CONN\n"; else OUT="$OUT  (none)\n"; fi
-          OUT="$OUT""\nPaired:\n"
-          PAIRED=$($BT devices Paired 2>/dev/null | ${pkgs.gnused}/bin/sed -E 's/^Device [0-9A-F:]+ /  • /')
-          if [ -n "$PAIRED" ]; then OUT="$OUT$PAIRED\n"; else OUT="$OUT  (none)\n"; fi
-          ${pkgs.coreutils}/bin/printf '%b' "$OUT" | ${pkgs.gnused}/bin/sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
-        '')
-        # Toggle the adapter power on/off.
-        (pkgs.writeShellScriptBin "ironbar-bt-toggle" ''
-          BT=${pkgs.bluez}/bin/bluetoothctl
-          if $BT show 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "Powered: yes"; then
-            $BT power off >/dev/null 2>&1
-            ${pkgs.libnotify}/bin/notify-send "Bluetooth" "Powered off"
-          else
-            $BT power on >/dev/null 2>&1
-            ${pkgs.libnotify}/bin/notify-send "Bluetooth" "Powered on"
-          fi
-        '')
-        # Fuzzel chooser: lists known devices for quick connect/disconnect, with
-        # an option to scan for new devices to pair. Selecting a device toggles
-        # its connection; an unpaired device is paired + trusted + connected.
-        (pkgs.writeShellScriptBin "ironbar-bt-menu" ''
-          BT=${pkgs.bluez}/bin/bluetoothctl
-          FUZZEL=${pkgs.fuzzel}/bin/fuzzel
-          NOTIFY=${pkgs.libnotify}/bin/notify-send
-          TMP=$(${pkgs.coreutils}/bin/mktemp)
-          SCAN_LABEL="⟳  Scan for new devices…"
-
-          $BT power on >/dev/null 2>&1
-
-          list_to_file() {
-            : > "$TMP"
-            $BT devices 2>/dev/null | while read -r _ mac name; do
-              [ -z "$mac" ] && continue
-              info=$($BT info "$mac" 2>/dev/null)
-              if ${pkgs.coreutils}/bin/printf '%s' "$info" | ${pkgs.gnugrep}/bin/grep -q "Connected: yes"; then
-                ${pkgs.coreutils}/bin/printf '%s\t✓  %s  (connected)\n' "$mac" "$name" >> "$TMP"
-              elif ${pkgs.coreutils}/bin/printf '%s' "$info" | ${pkgs.gnugrep}/bin/grep -q "Paired: yes"; then
-                ${pkgs.coreutils}/bin/printf '%s\t•  %s\n' "$mac" "$name" >> "$TMP"
-              else
-                ${pkgs.coreutils}/bin/printf '%s\t+  %s  (new)\n' "$mac" "$name" >> "$TMP"
-              fi
-            done
-          }
-
-          show_menu() {
-            { ${pkgs.coreutils}/bin/printf '%s\n' "$SCAN_LABEL"; ${pkgs.coreutils}/bin/cut -f2- "$TMP"; } \
-              | $FUZZEL --dmenu --prompt "Bluetooth  "
-          }
-
-          list_to_file
-          CHOICE=$(show_menu)
-          if [ "$CHOICE" = "$SCAN_LABEL" ]; then
-            $NOTIFY "Bluetooth" "Scanning…"
-            $BT --timeout 6 scan on >/dev/null 2>&1
-            list_to_file
-            CHOICE=$(show_menu)
-          fi
-
-          if [ -z "$CHOICE" ] || [ "$CHOICE" = "$SCAN_LABEL" ]; then ${pkgs.coreutils}/bin/rm -f "$TMP"; exit 0; fi
-          MAC=$(${pkgs.gawk}/bin/awk -F'\t' -v c="$CHOICE" '$2==c{print $1; exit}' "$TMP")
-          ${pkgs.coreutils}/bin/rm -f "$TMP"
-          [ -z "$MAC" ] && exit 0
-
-          info=$($BT info "$MAC" 2>/dev/null)
-          if ${pkgs.coreutils}/bin/printf '%s' "$info" | ${pkgs.gnugrep}/bin/grep -q "Connected: yes"; then
-            $BT disconnect "$MAC" >/dev/null 2>&1 && $NOTIFY "Bluetooth" "Disconnected"
-          elif ${pkgs.coreutils}/bin/printf '%s' "$info" | ${pkgs.gnugrep}/bin/grep -q "Paired: yes"; then
-            $BT connect "$MAC" >/dev/null 2>&1 && $NOTIFY "Bluetooth" "Connected" || $NOTIFY "Bluetooth" "Connection failed"
-          else
-            $NOTIFY "Bluetooth" "Pairing…"
-            $BT pair "$MAC" >/dev/null 2>&1
-            $BT trust "$MAC" >/dev/null 2>&1
-            if $BT connect "$MAC" >/dev/null 2>&1; then $NOTIFY "Bluetooth" "Paired & connected"; else $NOTIFY "Bluetooth" "Pairing failed"; fi
-          fi
-        '')
-        (pkgs.writeShellScriptBin "ironbar-swaync" ''
-          COUNT=$(${pkgs.swaynotificationcenter}/bin/swaync-client -c 2>/dev/null || echo 0)
-          DND=$(${pkgs.swaynotificationcenter}/bin/swaync-client -D 2>/dev/null || echo "false")
-          if [ "$COUNT" = "" ]; then COUNT=0; fi
-
-          if [ "$DND" = "true" ]; then
-            echo "󰂛 $COUNT"
-          elif [ "$COUNT" -gt 0 ]; then
-            echo "󱅫 $COUNT"
-          else
-            echo "󰂚 "
-          fi
-        '')
-        (pkgs.writeShellScriptBin "ironbar-swaync-icon" ''
-          COUNT=$(${pkgs.swaynotificationcenter}/bin/swaync-client -c 2>/dev/null || echo 0)
-          DND=$(${pkgs.swaynotificationcenter}/bin/swaync-client -D 2>/dev/null || echo "false")
-          if [ "$COUNT" = "" ]; then COUNT=0; fi
-
-          if [ "$DND" = "true" ]; then
-            echo "󰂛"
-          elif [ "$COUNT" -gt 0 ]; then
-            echo "󱅫"
-          else
-            echo "󰂚"
-          fi
-        '')
-        (pkgs.writeShellScriptBin "ironbar-swaync-count" ''
-          COUNT=$(${pkgs.swaynotificationcenter}/bin/swaync-client -c 2>/dev/null || echo 0)
-          if [ "$COUNT" = "" ]; then COUNT=0; fi
-          if [ "$COUNT" -gt 0 ]; then
-            echo "$COUNT"
-          fi
-        '')
       ];
 
       home.file.".cargo/config.toml".text = ''
@@ -620,6 +437,7 @@ in
         };
         Install.WantedBy = [ "timers.target" ];
       };
+
 
       home.stateVersion = cfg.stateVersion;
     };
@@ -786,7 +604,7 @@ in
       jdks = [ jdk8 jdk17 jdk21 jdk25 ];
     })
     quickshell catppuccin-sddm polkit_gnome
-    wget neovim wl-clipboard fuzzel nautilus file-roller 
+    wget neovim wl-clipboard fuzzel nautilus file-roller
     loupe mpv pavucontrol playerctl pciutils usbutils lm_sensors libfido2
     git micro ntfs3g glib sbctl oreo-cursors-plus fastfetch xwayland-satellite
     mcontrolcenter blueman btrfs-assistant cliphist pinentry-gnome3
@@ -800,17 +618,11 @@ in
     file
     xdg-utils
     libnotify
-
-    (writeShellScriptBin "cliphist-fuzzel-img" ''
-      #!/usr/bin/env bash
-      export PATH="${lib.makeBinPath [ cliphist fuzzel wl-clipboard gawk file xdg-utils libnotify coreutils ]}:$PATH"
-      
-      # Paste the raw contents of cliphist-fuzzel-img from GitHub below:
-    '')
   ];
 
   programs.ccache.enable = true;
   programs.nix-ld.enable = true;
+  programs.appimage.binfmt = true;
 
   hardware.enableAllFirmware = true;
 
@@ -882,7 +694,7 @@ in
   programs.gnupg.agent = {
     enable = true;
     enableSSHSupport = true;
-    pinentryPackage = pkgs.pinentry-curses; 
+    pinentryPackage = pkgs.pinentry-gnome3;
   };
 
   programs.ssh.startAgent = false;

@@ -6,6 +6,183 @@ let
   ironbarPkg = ironbar-flake.packages.${pkgs.stdenv.hostPlatform.system}.default;
 in
 {
+  home.packages = with pkgs; [
+    (writeShellScriptBin "ironbar-swaync-toggle" ''
+      ${swaynotificationcenter}/bin/swaync-client -t -sw &
+    '')
+    (writeShellScriptBin "ironbar-swaync-dnd" ''
+      ${swaynotificationcenter}/bin/swaync-client -d &
+    '')
+    (writeShellScriptBin "ironbar-sys-details" ''
+      CPU_TEMP=$(${lm_sensors}/bin/sensors | ${gnugrep}/bin/grep "Package id 0:" | ${gawk}/bin/awk '{print $4}')
+      CPU_FREQ=$(${coreutils}/bin/cat /proc/cpuinfo | ${gnugrep}/bin/grep "cpu MHz" | ${coreutils}/bin/head -n1 | ${gawk}/bin/awk '{print $4}')
+      echo "CPU Temp: $CPU_TEMP"
+      echo "CPU Speed: ''${CPU_FREQ%.*} MHz"
+    '')
+    (writeShellScriptBin "ironbar-gpu-details" ''
+      TEMP=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader 2>/dev/null || echo "N/A")
+      LOAD=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null || echo "N/A")
+      echo "Load: ''${LOAD}%  |  Temp: ''${TEMP}°C"
+      echo "--- Apps Using GPU ---"
+      nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader 2>/dev/null | ${gawk}/bin/awk -F', ' '{print " • " $2 " (" $3 ")"}'
+    '')
+    (writeShellScriptBin "ironbar-storage-details" ''
+      DISK_INFO=$(${coreutils}/bin/df -h / | ${coreutils}/bin/tail -n 1)
+      SIZE=$(echo "$DISK_INFO" | ${gawk}/bin/awk '{print $2}')
+      USED=$(echo "$DISK_INFO" | ${gawk}/bin/awk '{print $3}')
+      AVAIL=$(echo "$DISK_INFO" | ${gawk}/bin/awk '{print $4}')
+      USE_PERC=$(echo "$DISK_INFO" | ${gawk}/bin/awk '{print $5}')
+      echo "Root Partition (/):"
+      echo "Total: $SIZE | Used: $USED ($USE_PERC) | Free: $AVAIL"
+      echo ""
+      echo "RAM Status:"
+      ${procps}/bin/free -h | ${gnugrep}/bin/grep "Mem:" | ${gawk}/bin/awk '{print "Total: " $2 " | Used: " $3 " | Free: " $4}'
+    '')
+    (writeShellScriptBin "ironbar-services" ''
+      echo "Main Services Status:"
+      systemctl --user is-active ironbar awww swaync | ${gawk}/bin/awk 'BEGIN {a[0]="ironbar"; a[1]="swaybg"; a[2]="swaync"} {print a[NR-1] ": " $0}'
+      echo ""
+      echo "System Load: $(${coreutils}/bin/uptime | ${gawk}/bin/awk -F'load average:' '{ print $2 }')"
+    '')
+    (writeShellScriptBin "ironbar-music" ''
+      STATUS=$(${playerctl}/bin/playerctl status 2>/dev/null)
+      if [ "$STATUS" = "Playing" ] || [ "$STATUS" = "Paused" ]; then
+          ARTIST=$(${playerctl}/bin/playerctl metadata artist)
+          TITLE=$(${playerctl}/bin/playerctl metadata title)
+          echo "  󰎆 ''${TITLE} - ''${ARTIST}  "
+      else
+          echo ""
+      fi
+    '')
+    (writeShellScriptBin "ironbar-audio" ''
+      VOL=$(${pulseaudio}/bin/pactl get-sink-volume @DEFAULT_SINK@ | ${gnugrep}/bin/grep -o '[0-9]*%' | ${coreutils}/bin/head -n1)
+      MIC=$(${pulseaudio}/bin/pactl get-source-volume @DEFAULT_SOURCE@ | ${gnugrep}/bin/grep -o '[0-9]*%' | ${coreutils}/bin/head -n1)
+      echo "  󰕾 ''${VOL}   ''${MIC}  "
+    '')
+    (writeShellScriptBin "ironbar-bluetooth" ''
+      DEV=$(${wireplumber}/bin/wpctl status | ${gnugrep}/bin/grep -i 'bluez' | ${coreutils}/bin/head -n1 | ${gnused}/bin/sed -E 's/.*[0-9]+\.\s*(.*)\s*\[.*/\1/')
+      if [ -n "$DEV" ]; then
+        echo "󰋋 ''${DEV}"
+      else
+        echo "󰂯"
+      fi
+    '')
+    (writeShellScriptBin "ironbar-blueman" ''
+      ${blueman}/bin/blueman-manager &
+    '')
+    (writeShellScriptBin "ironbar-bt-status" ''
+      BT=${bluez}/bin/bluetoothctl
+      if $BT show 2>/dev/null | ${gnugrep}/bin/grep -q "Powered: yes"; then
+        OUT="Bluetooth: On\n\n"
+      else
+        OUT="Bluetooth: Off\n\n"
+      fi
+      OUT="$OUT""Connected:\n"
+      CONN=$($BT devices Connected 2>/dev/null | ${gnused}/bin/sed -E 's/^Device [0-9A-F:]+ /  • /')
+      if [ -n "$CONN" ]; then OUT="$OUT$CONN\n"; else OUT="$OUT  (none)\n"; fi
+      OUT="$OUT""\nPaired:\n"
+      PAIRED=$($BT devices Paired 2>/dev/null | ${gnused}/bin/sed -E 's/^Device [0-9A-F:]+ /  • /')
+      if [ -n "$PAIRED" ]; then OUT="$OUT$PAIRED\n"; else OUT="$OUT  (none)\n"; fi
+      ${coreutils}/bin/printf '%b' "$OUT" | ${gnused}/bin/sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
+    '')
+    (writeShellScriptBin "ironbar-bt-toggle" ''
+      BT=${bluez}/bin/bluetoothctl
+      if $BT show 2>/dev/null | ${gnugrep}/bin/grep -q "Powered: yes"; then
+        $BT power off >/dev/null 2>&1
+        ${libnotify}/bin/notify-send "Bluetooth" "Powered off"
+      else
+        $BT power on >/dev/null 2>&1
+        ${libnotify}/bin/notify-send "Bluetooth" "Powered on"
+      fi
+    '')
+    (writeShellScriptBin "ironbar-bt-menu" ''
+      BT=${bluez}/bin/bluetoothctl
+      FUZZEL=${fuzzel}/bin/fuzzel
+      NOTIFY=${libnotify}/bin/notify-send
+      TMP=$(${coreutils}/bin/mktemp)
+      SCAN_LABEL="⟳  Scan for new devices…"
+
+      $BT power on >/dev/null 2>&1
+
+      list_to_file() {
+        : > "$TMP"
+        $BT devices 2>/dev/null | while read -r _ mac name; do
+          [ -z "$mac" ] && continue
+          info=$($BT info "$mac" 2>/dev/null)
+          if ${coreutils}/bin/printf '%s' "$info" | ${gnugrep}/bin/grep -q "Connected: yes"; then
+            ${coreutils}/bin/printf '%s\t✓  %s  (connected)\n' "$mac" "$name" >> "$TMP"
+          elif ${coreutils}/bin/printf '%s' "$info" | ${gnugrep}/bin/grep -q "Paired: yes"; then
+            ${coreutils}/bin/printf '%s\t•  %s\n' "$mac" "$name" >> "$TMP"
+          else
+            ${coreutils}/bin/printf '%s\t+  %s  (new)\n' "$mac" "$name" >> "$TMP"
+          fi
+        done
+      }
+
+      show_menu() {
+        { ${coreutils}/bin/printf '%s\n' "$SCAN_LABEL"; ${coreutils}/bin/cut -f2- "$TMP"; } \
+          | $FUZZEL --dmenu --prompt "Bluetooth  "
+      }
+
+      list_to_file
+      CHOICE=$(show_menu)
+      if [ "$CHOICE" = "$SCAN_LABEL" ]; then
+        $NOTIFY "Bluetooth" "Scanning…"
+        $BT --timeout 6 scan on >/dev/null 2>&1
+        list_to_file
+        CHOICE=$(show_menu)
+      fi
+
+      if [ -z "$CHOICE" ] || [ "$CHOICE" = "$SCAN_LABEL" ]; then ${coreutils}/bin/rm -f "$TMP"; exit 0; fi
+      MAC=$(${gawk}/bin/awk -F'\t' -v c="$CHOICE" '$2==c{print $1; exit}' "$TMP")
+      ${coreutils}/bin/rm -f "$TMP"
+      [ -z "$MAC" ] && exit 0
+
+      info=$($BT info "$MAC" 2>/dev/null)
+      if ${coreutils}/bin/printf '%s' "$info" | ${gnugrep}/bin/grep -q "Connected: yes"; then
+        $BT disconnect "$MAC" >/dev/null 2>&1 && $NOTIFY "Bluetooth" "Disconnected"
+      elif ${coreutils}/bin/printf '%s' "$info" | ${gnugrep}/bin/grep -q "Paired: yes"; then
+        $BT connect "$MAC" >/dev/null 2>&1 && $NOTIFY "Bluetooth" "Connected" || $NOTIFY "Bluetooth" "Connection failed"
+      else
+        $NOTIFY "Bluetooth" "Pairing…"
+        $BT pair "$MAC" >/dev/null 2>&1
+        $BT trust "$MAC" >/dev/null 2>&1
+        if $BT connect "$MAC" >/dev/null 2>&1; then $NOTIFY "Bluetooth" "Paired & connected"; else $NOTIFY "Bluetooth" "Pairing failed"; fi
+      fi
+    '')
+    (writeShellScriptBin "ironbar-swaync" ''
+      COUNT=$(${swaynotificationcenter}/bin/swaync-client -c 2>/dev/null || echo 0)
+      DND=$(${swaynotificationcenter}/bin/swaync-client -D 2>/dev/null || echo "false")
+      if [ "$COUNT" = "" ]; then COUNT=0; fi
+      if [ "$DND" = "true" ]; then
+        echo "󰂛 $COUNT"
+      elif [ "$COUNT" -gt 0 ]; then
+        echo "󱅫 $COUNT"
+      else
+        echo "󰂚 "
+      fi
+    '')
+    (writeShellScriptBin "ironbar-swaync-icon" ''
+      COUNT=$(${swaynotificationcenter}/bin/swaync-client -c 2>/dev/null || echo 0)
+      DND=$(${swaynotificationcenter}/bin/swaync-client -D 2>/dev/null || echo "false")
+      if [ "$COUNT" = "" ]; then COUNT=0; fi
+      if [ "$DND" = "true" ]; then
+        echo "󰂛"
+      elif [ "$COUNT" -gt 0 ]; then
+        echo "󱅫"
+      else
+        echo "󰂚"
+      fi
+    '')
+    (writeShellScriptBin "ironbar-swaync-count" ''
+      COUNT=$(${swaynotificationcenter}/bin/swaync-client -c 2>/dev/null || echo 0)
+      if [ "$COUNT" = "" ]; then COUNT=0; fi
+      if [ "$COUNT" -gt 0 ]; then
+        echo "$COUNT"
+      fi
+    '')
+  ];
+
   systemd.user.services.ironbar = {
     Unit = {
       Description = "Ironbar Wayland bar";
