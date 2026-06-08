@@ -105,6 +105,16 @@ in
         allow-tearing
     }
 
+     window-rule {
+        match app-id="Gw2-64.exe"
+        allow-tearing
+    }
+
+    window-rule {
+        match app-id="DetroitBecomeH"
+        allow-tearing
+    }
+   
     window-rule {
         match app-id="cs2"
         allow-tearing

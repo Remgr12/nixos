@@ -20,7 +20,7 @@
     };
 
     noctalia-shell = {
-      url = "github:noctalia-dev/noctalia-shell/v5";
+      url = "github:noctalia-dev/noctalia-shell/main";
     };
 
     nixvim = {
@@ -44,6 +44,8 @@
     };
 
     crane.url = "github:ipetkov/crane";
+
+    chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
   };
 
   outputs = { self, nixpkgs, home-manager, ... }@inputs: {
@@ -53,7 +55,8 @@
       modules = [
         ./options.nix
         ./configuration.nix
-        
+        inputs.chaotic.nixosModules.default
+
         home-manager.nixosModules.home-manager {
           home-manager.extraSpecialArgs = { inherit inputs; };
         }

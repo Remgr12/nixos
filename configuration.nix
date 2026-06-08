@@ -54,6 +54,10 @@ in
     persist = true;
   }];
 
+  nix.extraOptions = ''
+    !include /etc/secret/github.conf
+  '';
+
   boot.kernelParams = [ 
     "nvidia-drm.modeset=1" 
     "drm.edid_firmware=${cfg.monitor}:edid/edid.bin"
@@ -90,6 +94,7 @@ in
       intel-media-driver
       intel-vaapi-driver
       nvidia-vaapi-driver
+      lsfg-vk
     ];
   };
 
@@ -321,11 +326,12 @@ in
         (python3.withPackages (ps: [ ps.pip ]))
         btop gemini-cli spicetify-cli protonplus
         zotero onlyoffice-desktopeditors vlc appflowy blanket
-        khal vdirsyncer telegram-desktop
+        telegram-desktop
         stirling-pdf davinci-resolve networkmanagerapplet
         gale fzf teams-for-linux
         i2p mullvad-browser avahi wayvr xdg-desktop-portal-gnome
-      ];
+	steam-tui steamcmd lutris blockbench aseprite
+       ];
 
       home.file.".cargo/config.toml".text = ''
         [build]
@@ -341,72 +347,13 @@ in
       };
       home.sessionPath = [ "$HOME/.npm-global/bin" ];
 
-      xdg.configFile."khal/config".text = ''
-        [calendars]
-        [[default]]
-        path = ~/.local/share/khal/calendars/
-        color = cyan
-
-        [sqlite]
-        path = ~/.local/share/khal/khal.db
-
-        [locale]
-        timeformat = %H:%M
-        dateformat = %d/%m/%Y
-        datetimeformat = %d/%m/%Y %H:%M
-        firstweekday = 0
-      '';
-
-      xdg.configFile."vdirsyncer/config".text = ''
-        [general]
-        status_path = "~/.local/share/vdirsyncer/status/"
-
-        # Uncomment and fill in to add a remote calendar, then run:
-        #   vdirsyncer discover && vdirsyncer sync
-
-        # [pair personal_calendar]
-        # a = "personal_local"
-        # b = "personal_remote"
-        # collections = ["from a", "from b"]
-
-        # [storage personal_local]
-        # type = "filesystem"
-        # path = "~/.local/share/khal/calendars/"
-        # fileext = ".ics"
-
-        # [storage personal_remote]
-        # type = "caldav"
-        # url = "https://YOUR_CALDAV_SERVER/calendars/USERNAME/"
-        # username = "USERNAME"
-        # password = "PASSWORD"
-
-        # Google Calendar (read-only iCal):
-        # type = "http"
-        # url = "https://calendar.google.com/calendar/ical/YOUR_ID/basic.ics"
-      '';
-
-      systemd.user.services.vdirsyncer = {
-        Unit.Description = "vdirsyncer calendar sync";
-        Service = {
-          Type = "oneshot";
-          ExecStart = "${pkgs.vdirsyncer}/bin/vdirsyncer sync";
-        };
-      };
-
-      systemd.user.timers.vdirsyncer = {
-        Unit.Description = "vdirsyncer calendar sync timer";
-        Timer = {
-          OnBootSec = "2min";
-          OnUnitActiveSec = "30min";
-          Persistent = true;
-        };
-        Install.WantedBy = [ "timers.target" ];
-      };
-
-
       home.stateVersion = cfg.stateVersion;
     };
   };
+
+  nixpkgs.config.permittedInsecurePackages = [
+    "googleearth-pro-7.3.7.1155"
+  ];
 
   programs.gamescope = {
       enable = true;
@@ -465,7 +412,7 @@ in
     };
   };
 
-  powerManagement.cpuFreqGovernor = "performance";
+  powerManagement.cpuFreqGovernor = "schedutil";
   hardware.cpu.intel.updateMicrocode = true;
 
   programs.gamemode.enable = true;
@@ -476,13 +423,18 @@ in
 
   boot.kernel.sysctl = {
     "kernel.sysrq" = 1;
-    "vm.swappiness" = 10;
-    "vm.dirty_ratio" = 60;
-    "vm.dirty_background_ratio" = 2;
+    # zram is RAM-backed: swap into it aggressively instead of dropping hot
+    # page cache, and disable swap read-ahead (zram is random-access).
+    "vm.swappiness" = 180;
+    "vm.page-cluster" = 0;
+    # Lower dirty thresholds: with 16G RAM dirty_ratio=60 buffered ~9G before
+    # forcing synchronous writeback (multi-second stalls). NVMe doesn't need it.
+    "vm.dirty_ratio" = 10;
+    "vm.dirty_background_ratio" = 5;
     "kernel.nmi_watchdog" = 0;
   };
 
-  boot.kernelPackages = pkgs.linuxPackages_zen;
+  boot.kernelPackages = pkgs.linuxPackages_cachyos;
   
   boot.loader.limine.enable = true;
   boot.loader.limine.extraConfig = ''
@@ -577,7 +529,9 @@ in
     system-config-printer
     libappindicator-gtk3 appimage-run mangohud ffmpeg
     claude-code
-    mcp-nixos lsfg-vk lsfg-vk-ui
+    mcp-nixos lsfg-vk-ui
+    googleearth-pro freetube
+    qbittorrent-enhanced
 
     gawk
     file
