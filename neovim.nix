@@ -8,6 +8,7 @@
   programs.nixvim = {
     enable = true;
     defaultEditor = true;
+    nixpkgs.source = inputs.nixpkgs;
 
     globals = {
       mapleader = " ";
@@ -16,18 +17,17 @@
 
     # Extra System Packages
     extraPackages = with pkgs; [
-      git 
-      lua-language-server 
-      stylua 
-      ripgrep 
-      fd 
+      git
+      lua-language-server
+      stylua
+      ripgrep
+      fd
       gcc
       lazygit
-      wl-clipboard # For Wayland clipboard support
-      xclip        # For X11 clipboard support
+      wl-clipboard
+      xclip
     ];
 
-    # Core Options
     opts = {
       termguicolors = false;
       number = true;
@@ -35,28 +35,16 @@
       shiftwidth = 2;
       fillchars = { eob = " "; };
       ruler = false;
+      clipboard = "unnamedplus";
     };
 
-    # Custom Keymaps
     keymaps = [
-      {
-        mode = "n";
-        key = "<leader>gg";
-        action = "<cmd>lua Snacks.lazygit()<CR>";
-        options.desc = "Open LazyGit";
-      }
-      {
-        mode = "v";
-        key = "d";
-        action = "\"_d"; # Uses the blackhole register to delete without saving
-        options.desc = "Delete without yanking";
-      }
-      {
-        mode = "v";
-        key = "x";
-        action = "\"+d"; # Uses the + register to cut to the system clipboard
-        options.desc = "Cut to system clipboard";
-      }
+      { mode = "n"; key = "<leader>e"; action = "<cmd>Neotree toggle<CR>"; options.desc = "Explorer NeoTree"; }
+      { mode = "n"; key = "<leader><space>"; action = "<cmd>Telescope find_files<CR>"; options.desc = "Find Files"; }
+      { mode = "n"; key = "<leader>/"; action = "<cmd>Telescope live_grep<CR>"; options.desc = "Grep (Root Dir)"; }
+      { mode = "n"; key = "<leader>gg"; action = "<cmd>lua Snacks.lazygit()<CR>"; options.desc = "Open LazyGit"; }
+      { mode = "v"; key = "d"; action = "\"_d"; options.desc = "Delete without yanking"; }
+      { mode = "v"; key = "x"; action = "\"+d"; options.desc = "Cut to system clipboard"; }
     ];
 
     # Plugins
@@ -99,11 +87,22 @@
         };
       };
 
-      # AI Assistants
+      bufferline.enable = false;
+      noice.enable = true;
+      notify.enable = true;
+
       copilot-lua = {
         enable = true;
         settings = {
-          suggestion.auto_trigger = true;
+          suggestion = {
+            auto_trigger = true;
+            keymap = {
+              accept = "<Tab>";
+              next = "`";
+              prev = "<M-[>";
+              dismiss = "<C-]>";
+            };
+          };
           panel.enabled = false;
         };
       };

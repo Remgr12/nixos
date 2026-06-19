@@ -19,8 +19,7 @@ in
     spawn-at-startup "mcontrolcenter"
     spawn-at-startup "gpuishell"
 
-    spawn-at-startup "wl-paste" "--watch" "cliphist" "store"
-    spawn-at-startup "wl-paste" "--primary" "--watch" "cliphist" "store"
+    spawn-at-startup "copyq"
 
     input {
         focus-follows-mouse
@@ -130,6 +129,12 @@ in
     }    
 
     window-rule {
+        match app-id="copyq"
+        open-floating true
+        default-column-width { proportion 0.45; }
+    }
+
+    window-rule {
         match app-id="localsend_app"
         open-floating true
     }
@@ -172,7 +177,7 @@ in
         Mod+Z { toggle-window-floating; }
         Mod+Shift+Z { switch-focus-between-floating-and-tiling; }
 
-        Mod+V { spawn "cliphist-fuzzel-img"; }
+        Mod+V { spawn "copyq" "toggle"; }
 
         Mod+A { toggle-overview; }
         Mod+Escape { spawn "~/Repositories/scripts/powermenu.sh"; }

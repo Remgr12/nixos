@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=MPRIS Player
+Comment=Floating music player widget with lyrics
+Exec=aurora-mpris-player
+Icon=audio-headphones-symbolic
+Type=Application
+Categories=Audio;Music;Player;
+Keywords=music;player;mpris;spotify;lyrics;

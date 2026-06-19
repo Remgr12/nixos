@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    
+
     home-manager = {
       url = "github:nix-community/home-manager/master";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -24,10 +24,31 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    noctalia-shell = {
+      url = "github:noctalia-dev/noctalia-shell/main";
+    };
+
     nixvim = {
       url = "github:nix-community/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    antigravity-nix = {
+      url = "github:jacopone/antigravity-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    llm-agents = {
+      url = "github:numtide/llm-agents.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    aurora-shell = {
+      url = "github:Spn4x/Aurora-Shell";
+      flake = false;
+    };
+
+    crane.url = "github:ipetkov/crane";
   };
 
   outputs = { self, nixpkgs, home-manager, ... }@inputs: {

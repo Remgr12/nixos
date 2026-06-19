@@ -2,30 +2,67 @@
 
 let
   cfg = config.myOptions;
-  home-manager-src = builtins.fetchTarball {
-    url = "https://github.com/nix-community/home-manager/archive/master.tar.gz";
-  };
-  
-  spicetify-nix = inputs.spicetify-nix;
-  niri-flake    = inputs.niri-flake;
-  ironbar-flake = inputs.ironbar-flake;
+
+  spicetify-nix    = inputs.spicetify-nix;
+  niri-flake       = inputs.niri-flake;
+  ironbar-flake    = inputs.ironbar-flake;
+  noctalia-shell   = inputs.noctalia-shell;
+  antigravity-nix  = inputs.antigravity-nix;
+  llm-agents       = inputs.llm-agents;
 in
 {
-  imports = [ 
-    ./hardware-configuration.nix 
+  imports = [
+    ./hardware-configuration.nix
   ];
 
-  nix.settings = {
-    experimental-features = [ "nix-command" "flakes" ];
-    auto-optimise-store = true;
+  nix = {
+    settings = {
+      experimental-features = [ "nix-command" "flakes" ];
+      auto-optimise-store = true;
+      max-jobs = "auto";
+      cores = 0;
+      substituters = [
+        "https://cache.nixos.org"
+        "https://nix-community.cachix.org"
+        "https://cache.garnix.io"
+        "https://noctalia.cachix.org"
+      ];
+      trusted-public-keys = [
+        "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+        "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+        "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
+        "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
+      ];
+    };
+    gc = {
+      automatic = true;
+      dates = "weekly";
+      options = "--delete-older-than 7d";
+    };
   };
 
-  boot.kernelParams = [ 
+  security.sudo.enable = false;
+  security.doas.enable = true;
+  security.doas.extraRules = [{
+    users = [ "${cfg.username}" ];
+    keepEnv = true;
+    persist = true;
+  }];
+
+  nix.extraOptions = ''
+    !include /etc/secret/github.conf
+  '';
+
+ services.logind.settings = {
+    Login = {
+      HandleLidSwitch = "ignore";
+    };
+  };
+
+  boot.kernelParams = [
     "quiet"
     "splash"
   ];
-
-  programs.steam.enable = true;
   
   boot.initrd.kernelModules = [ "i915" ];
 
@@ -42,9 +79,13 @@ in
 
   services.btrfs.autoScrub = {
     enable = true;
-    interval = "weekly"; 
+    interval = "weekly";
     fileSystems = [ "/" ];
   };
+
+  systemd.tmpfiles.rules = [
+    "d /home/.snapshots 0750 root root -"
+  ];
 
   services.snapper = {
     configs = {
@@ -69,7 +110,7 @@ in
 
   programs.dconf.enable = true;
   services.dbus.packages = [ pkgs.gsettings-desktop-schemas pkgs.mcontrolcenter ];
-  
+
   services.gvfs.enable = true;
   services.udisks2.enable = true;
   boot.supportedFilesystems = [ "ntfs" ];
@@ -94,15 +135,22 @@ in
   home-manager = {
     useGlobalPkgs = true;
     useUserPackages = true;
-    backupFileExtension = "bak"; 
+    backupFileExtension = "bak";
     users."${cfg.username}" = { pkgs, inputs, ... }: {
-      imports = [ 
-        spicetify-nix.homeManagerModules.default 
+
+      _module.args = { inherit inputs; };
+
+      imports = [
+        spicetify-nix.homeManagerModules.default
+        noctalia-shell.homeModules.default
         ironbar-flake.homeManagerModules.default
         ./neovim.nix
+        ./copyq.nix
         ./ironbar.nix
         ./niri.nix
         ./zsh.nix
+        ./antigravity.nix
+        ./aurora-mpris.nix
       ];
 
       systemd.user.services.swww = {
@@ -156,54 +204,70 @@ in
           button { background: #4C566A; color: #D8DEE9; border-radius: 4px; padding: 4px; margin: 4px; border: none; }
           button:hover { background: #88C0D0; color: #2E3440; }
         '';
-      };        
+      };
+
+      programs.noctalia = {
+        enable = true;
+        systemd.enable = true;
+        settings = {
+          shell.font = "JetBrainsMono Nerd Font";
+          theme = {
+            mode = "dark";
+            source = "builtin";
+            builtin = "Nord";
+          };
+          wallpaper = {
+            enabled = true;
+            default.path = "/etc/nixos/nord.jpg";
+          };
+        };
+      };
 
       programs.git = {
         enable = true;
-        settings.user = { 
-          name = cfg.fullName; 
-          email = cfg.email; 
+        settings.user = {
+          name = cfg.fullName;
+          email = cfg.email;
         };
         signing = {
-            key = cfg.gitSigningKey;
-            signByDefault = true;
+          key = cfg.gitSigningKey;
+          signByDefault = true;
         };
       };
 
       programs.kitty = {
-          enable = true;
-          
-          settings = {
-            hide_window_decorations = "yes";
-            window_padding_width = 4;
-            shell = "zsh";
-            confirm_os_window_close = 0;
-            foreground = "#D8DEE9";
-            background = "#2E3440";
-            selection_foreground = "#000000";
-            selection_background = "#FFFACD";
-            url_color = "#0087BD";
-            cursor = "#81A1C1";
-            color0 = "#3B4252";
-            color8 = "#4C566A";
-            color1 = "#BF616A";
-            color9 = "#BF616A";
-            color2 = "#A3BE8C";
-            color10 = "#A3BE8C";
-            color3 = "#EBCB8B";
-            color11 = "#EBCB8B";
-            color4 = "#81A1C1";
-            color12 = "#81A1C1";
-            color5 = "#B48EAD";
-            color13 = "#B48EAD";
-            color6 = "#88C0D0";
-            color14 = "#8FBCBB";
-            color7 = "#E5E9F0";
-            color15 = "#ECEFF4";
-          };
+        enable = true;
+        settings = {
+          hide_window_decorations = "yes";
+          window_padding_width = 4;
+          shell = "zsh";
+          confirm_os_window_close = 0;
+          foreground = "#D8DEE9";
+          background = "#2E3440";
+          selection_foreground = "#000000";
+          selection_background = "#FFFACD";
+          url_color = "#0087BD";
+          cursor = "#81A1C1";
+          color0 = "#3B4252";
+          color8 = "#4C566A";
+          color1 = "#BF616A";
+          color9 = "#BF616A";
+          color2 = "#A3BE8C";
+          color10 = "#A3BE8C";
+          color3 = "#EBCB8B";
+          color11 = "#EBCB8B";
+          color4 = "#81A1C1";
+          color12 = "#81A1C1";
+          color5 = "#B48EAD";
+          color13 = "#B48EAD";
+          color6 = "#88C0D0";
+          color14 = "#8FBCBB";
+          color7 = "#E5E9F0";
+          color15 = "#ECEFF4";
         };
+      };
 
-      programs.spicetify = 
+      programs.spicetify =
         let
           spicePkgs = spicetify-nix.legacyPackages.${pkgs.stdenv.hostPlatform.system};
         in
@@ -213,7 +277,7 @@ in
           colorScheme = "frappe";
           enabledCustomApps = with spicePkgs.apps; [
             marketplace
-          ];            
+          ];
         };
 
       gtk = {
@@ -244,100 +308,35 @@ in
         thunderbird strawberry goofcord kitty micro 
         prismlauncher weylus mullvad-vpn gh chromium 
         localsend libreoffice-fresh firefox swaynotificationcenter
-        rustup gcc gnumake ruby odin ols nodejs_20 wireplumber
+        rustup gcc gnumake ruby odin ols nodejs_26 wireplumber
         (python3.withPackages (ps: [ ps.pip ]))
         btop gemini-cli spicetify-cli protonplus
-        zotero onlyoffice-desktopeditors vlc appflowy blanket
-        stirling-pdf davinci-resolve networkmanagerapplet
-        awww waypaper gale karere
-
-        (pkgs.writeShellScriptBin "ironbar-swaync-toggle" ''
-          ${pkgs.swaynotificationcenter}/bin/swaync-client -t -sw &
-        '')
-        (pkgs.writeShellScriptBin "ironbar-swaync-dnd" ''
-          ${pkgs.swaynotificationcenter}/bin/swaync-client -d &
-        '')
-
-        (pkgs.writeShellScriptBin "ironbar-sys-details" ''
-          CPU_TEMP=$(${pkgs.lm_sensors}/bin/sensors | ${pkgs.gnugrep}/bin/grep "Package id 0:" | ${pkgs.gawk}/bin/awk '{print $4}')
-          CPU_FREQ=$(${pkgs.coreutils}/bin/cat /proc/cpuinfo | ${pkgs.gnugrep}/bin/grep "cpu MHz" | ${pkgs.coreutils}/bin/head -n1 | ${pkgs.gawk}/bin/awk '{print $4}')
-          
-          echo "CPU Temp: $CPU_TEMP"
-          echo "CPU Speed: ''${CPU_FREQ%.*} MHz"
-        '')
-        (pkgs.writeShellScriptBin "ironbar-gpu-details" ''
-          echo "GPU: Intel UHD Graphics 615"
-          echo "Load information disabled (Intel iGPU)"
-        '')
-        (pkgs.writeShellScriptBin "ironbar-storage-details" ''
-          DISK_INFO=$(${pkgs.coreutils}/bin/df -h / | ${pkgs.coreutils}/bin/tail -n 1)
-          SIZE=$(echo "$DISK_INFO" | ${pkgs.gawk}/bin/awk '{print $2}')
-          USED=$(echo "$DISK_INFO" | ${pkgs.gawk}/bin/awk '{print $3}')
-          AVAIL=$(echo "$DISK_INFO" | ${pkgs.gawk}/bin/awk '{print $4}')
-          USE_PERC=$(echo "$DISK_INFO" | ${pkgs.gawk}/bin/awk '{print $5}')
-          echo "Root Partition (/):"
-          echo "Total: $SIZE | Used: $USED ($USE_PERC) | Free: $AVAIL"
-          echo ""
-          echo "RAM Status:"
-          ${pkgs.procps}/bin/free -h | ${pkgs.gnugrep}/bin/grep "Mem:" | ${pkgs.gawk}/bin/awk '{print "Total: " $2 " | Used: " $3 " | Free: " $4}'
-        '')
-        (pkgs.writeShellScriptBin "ironbar-services" ''
-          echo "Main Services Status:"
-          systemctl --user is-active ironbar awww swaync | ${pkgs.gawk}/bin/awk 'BEGIN {a[0]="ironbar"; a[1]="swaybg"; a[2]="swaync"} {print a[NR-1] ": " $0}'
-          echo ""
-          echo "System Load: $(${pkgs.coreutils}/bin/uptime | ${pkgs.gawk}/bin/awk -F'load average:' '{ print $2 }')"
-        '')
-        (pkgs.writeShellScriptBin "ironbar-music" ''
-          STATUS=$(${pkgs.playerctl}/bin/playerctl status 2>/dev/null)
-          if [ "$STATUS" = "Playing" ] || [ "$STATUS" = "Paused" ]; then
-              ARTIST=$(${pkgs.playerctl}/bin/playerctl metadata artist)
-              TITLE=$(${pkgs.playerctl}/bin/playerctl metadata title)
-              echo "  󰎆 ''${TITLE} - ''${ARTIST}  "
-          else
-              echo ""
-          fi
-        '')
-        (pkgs.writeShellScriptBin "ironbar-audio" ''
-          VOL=$(${pkgs.pulseaudio}/bin/pactl get-sink-volume @DEFAULT_SINK@ | ${pkgs.gnugrep}/bin/grep -o '[0-9]*%' | ${pkgs.coreutils}/bin/head -n1)
-          MIC=$(${pkgs.pulseaudio}/bin/pactl get-source-volume @DEFAULT_SOURCE@ | ${pkgs.gnugrep}/bin/grep -o '[0-9]*%' | ${pkgs.coreutils}/bin/head -n1)
-          echo "  󰕾 ''${VOL}   ''${MIC}  "
-        '')
-        (pkgs.writeShellScriptBin "ironbar-bluetooth" ''
-          DEV=$(${pkgs.wireplumber}/bin/wpctl status | ${pkgs.gnugrep}/bin/grep -i 'bluez' | ${pkgs.coreutils}/bin/head -n1 | ${pkgs.gnused}/bin/sed -E 's/.*[0-9]+\.\s*(.*)\s*\[.*/\1/')
-          if [ -n "$DEV" ]; then
-            echo "󰋋 ''${DEV}"
-          else
-            echo ""
-          fi
-        '')
-        (pkgs.writeShellScriptBin "ironbar-swaync" ''
-          COUNT=$(${pkgs.swaynotificationcenter}/bin/swaync-client -c 2>/dev/null || echo 0)
-          DND=$(${pkgs.swaynotificationcenter}/bin/swaync-client -D 2>/dev/null || echo "false")
-          if [ "$COUNT" = "" ]; then COUNT=0; fi
-          
-          if [ "$DND" = "true" ]; then
-            echo "󰂛 $COUNT"
-          elif [ "$COUNT" -gt 0 ]; then
-            echo "󱅫 $COUNT"
-          else
-            echo "󰂚 "
-          fi
-        '')
+        zotero vlc appflowy blanket stirling-pdf
+        telegram-desktop karere networkmanagerapplet
+        awww waypaper gale fzf
       ];
+
+      home.file.".cargo/config.toml".text = ''
+        [build]
+        rustc-wrapper = "${pkgs.sccache}/bin/sccache"
+
+        [target.x86_64-unknown-linux-gnu]
+        rustflags = ["-C", "link-arg=-fuse-ld=${pkgs.mold}/bin/mold"]
+      '';
 
       home.sessionVariables = {
         NPM_CONFIG_PREFIX = "$HOME/.npm-global";
-        GTK_CSD = "0"; 
+        GTK_CSD = "0";
       };
       home.sessionPath = [ "$HOME/.npm-global/bin" ];
 
       home.stateVersion = cfg.stateVersion;
-    }; 
+    };
   };
 
   programs.gamescope = {
-      enable = true;
-      capSysNice = true;
+    enable = true;
+    capSysNice = true;
   };
 
   services.displayManager.sddm = {
@@ -359,11 +358,12 @@ in
       };
     };
   };
-  
+
   services.flatpak.enable = true;
+
   time.timeZone = cfg.timezone;
   i18n.defaultLocale = cfg.locale;
-  
+
   environment.sessionVariables = {
     LIBVA_DRIVER_NAME = "iHD";
     NIXOS_OZONE_WL = "1";
@@ -387,7 +387,7 @@ in
   };
 
   boot.kernelPackages = pkgs.linuxPackages_zen;
-  
+
   boot.loader.limine.enable = true;
   boot.loader.limine.extraConfig = ''
     INTERFACE_SETTINGS=0
@@ -407,52 +407,54 @@ in
   '';
   boot.loader.limine.style.wallpapers = [ ./nord.jpg ];
   boot.loader.limine.style.wallpaperStyle = "centered";
-  
+
   boot.loader.efi.canTouchEfiVariables = true;
 
   system.activationScripts.secureBootSign = {
-        text = ''
-          echo "Signing boot files with sbctl..."
-          ${pkgs.findutils}/bin/find /boot -type f \( -iname "*.efi" -o -iname "*bzImage*" -o -iname "*vmlinuz*" \) -print0 | \
-            ${pkgs.findutils}/bin/xargs -0 -P $(${pkgs.coreutils}/bin/nproc) -I {} ${pkgs.sbctl}/bin/sbctl sign -s {} || true
-    
-          config_file="/boot/limine/limine.conf"
-          if [ -f "$config_file" ]; then
-            echo "Updating Limine hashes..."
-            
-            sed_script=$(${pkgs.coreutils}/bin/mktemp)
-    
-            ${pkgs.gnugrep}/bin/grep -oP '(?<=boot\(\):)/[^#\s]+#[0-9a-f]+' "$config_file" | \
-            ${pkgs.findutils}/bin/xargs -P $(${pkgs.coreutils}/bin/nproc) -I {} ${pkgs.bash}/bin/bash -c '
-              match="{}"
-              path="''${match%#*}"
-              old_hash="''${match#*#}"
-              phys_path="/boot''${path}"
-    
-              if [ -f "$phys_path" ]; then
-                new_hash=$(${pkgs.coreutils}/bin/b2sum "$phys_path" | ${pkgs.coreutils}/bin/cut -d" " -f1)
-                
-                if [ "$old_hash" != "$new_hash" ]; then
-                  echo "Updating hash for $path" >&2
-                  echo "s|''${path}#''${old_hash}|''${path}#''${new_hash}|g"
-                fi
-              fi
-            ' > "$sed_script"
-    
-            if [ -s "$sed_script" ]; then
-              ${pkgs.gnused}/bin/sed -f "$sed_script" "$config_file" > /tmp/limine_tmp.conf
-              ${pkgs.coreutils}/bin/cat /tmp/limine_tmp.conf > "$config_file"
-              ${pkgs.coreutils}/bin/rm /tmp/limine_tmp.conf
+    text = ''
+      echo "Signing boot files with sbctl..."
+      ${pkgs.findutils}/bin/find /boot -type f \( -iname "*.efi" -o -iname "*bzImage*" -o -iname "*vmlinuz*" \) -print0 | \
+        ${pkgs.findutils}/bin/xargs -0 -P $(${pkgs.coreutils}/bin/nproc) -I {} ${pkgs.sbctl}/bin/sbctl sign -s {} || true
+
+      config_file="/boot/limine/limine.conf"
+      if [ -f "$config_file" ]; then
+        echo "Updating Limine hashes..."
+
+        sed_script=$(${pkgs.coreutils}/bin/mktemp)
+
+        ${pkgs.gnugrep}/bin/grep -oP '(?<=boot\(\):)/[^#\s]+#[0-9a-f]+' "$config_file" | \
+        ${pkgs.findutils}/bin/xargs -P $(${pkgs.coreutils}/bin/nproc) -I {} ${pkgs.bash}/bin/bash -c '
+          match="{}"
+          path="''${match%#*}"
+          old_hash="''${match#*#}"
+          phys_path="/boot''${path}"
+
+          if [ -f "$phys_path" ]; then
+            new_hash=$(${pkgs.coreutils}/bin/b2sum "$phys_path" | ${pkgs.coreutils}/bin/cut -d" " -f1)
+
+            if [ "$old_hash" != "$new_hash" ]; then
+              echo "Updating hash for $path" >&2
+              echo "s|''${path}#''${old_hash}|''${path}#''${new_hash}|g"
             fi
-            ${pkgs.coreutils}/bin/rm -f "$sed_script"
           fi
-        '';
-      };
+        ' > "$sed_script"
+
+        if [ -s "$sed_script" ]; then
+          ${pkgs.gnused}/bin/sed -f "$sed_script" "$config_file" > /tmp/limine_tmp.conf
+          ${pkgs.coreutils}/bin/cat /tmp/limine_tmp.conf > "$config_file"
+          ${pkgs.coreutils}/bin/rm /tmp/limine_tmp.conf
+        fi
+        ${pkgs.coreutils}/bin/rm -f "$sed_script"
+      fi
+    '';
+  };
 
   networking.hostName = cfg.hostname;
   networking.networkmanager.enable = true;
   networking.networkmanager.wifi.powersave = false;
   networking.interfaces."${cfg.networkInterface}".useDHCP = true;
+  networking.firewall.allowedTCPPorts = [ 5353 9757 ];
+  networking.firewall.allowedUDPPorts = [ 5353 9757 ];
   nixpkgs.config.allowUnfree = true;
 
   programs.zsh = {
@@ -463,7 +465,7 @@ in
   users.users."${cfg.username}" = {
     isNormalUser = true;
     shell = pkgs.zsh;
-    extraGroups = [ "networkmanager" "wheel" "video" "audio" "storage" ];
+    extraGroups = [ "networkmanager" "wheel" "video" "audio" "storage" "lp" "scanner" ];
   };
 
   environment.systemPackages = with pkgs; [
@@ -471,26 +473,24 @@ in
       jdks = [ jdk8 jdk17 jdk21 jdk25 ];
     })
     quickshell catppuccin-sddm polkit_gnome
-    wget neovim wl-clipboard fuzzel nautilus file-roller 
+    wget neovim wl-clipboard fuzzel nautilus file-roller
     loupe mpv pavucontrol playerctl pciutils usbutils lm_sensors libfido2
     git micro ntfs3g glib sbctl oreo-cursors-plus fastfetch xwayland-satellite
-    mcontrolcenter blueman btrfs-assistant cliphist pinentry-gnome3
-    libappindicator-gtk3 appimage-run mangohud
+    mcontrolcenter blueman btrfs-assistant pinentry-gnome3
+    mold sccache
+    libappindicator-gtk3 appimage-run mangohud ffmpeg
+    claude-code
+    mcp-nixos freetube qbittorrent-enhanced
 
     gawk
     file
     xdg-utils
     libnotify
-
-    (writeShellScriptBin "cliphist-fuzzel-img" ''
-      #!/usr/bin/env bash
-      export PATH="${lib.makeBinPath [ cliphist fuzzel wl-clipboard gawk file xdg-utils libnotify coreutils ]}:$PATH"
-      
-      # Paste the raw contents of cliphist-fuzzel-img from GitHub below:
-    '')
   ];
 
+  programs.ccache.enable = true;
   programs.nix-ld.enable = true;
+  programs.appimage.binfmt = true;
 
   hardware.enableAllFirmware = true;
 
@@ -498,18 +498,18 @@ in
     nerd-fonts.jetbrains-mono
     nerd-fonts.symbols-only
   ];
-  
+
   programs.niri = {
     enable = true;
     package = niri-flake.packages.${pkgs.stdenv.hostPlatform.system}.niri;
   };
 
   security.rtkit.enable = true;
-  services.pipewire = { 
-    enable = true; 
-    pulse.enable = true; 
-    alsa.enable = true; 
-    alsa.support32Bit = true; 
+  services.pipewire = {
+    enable = true;
+    pulse.enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
     extraConfig.pipewire."92-low-latency" = {
       "context.properties" = {
         "default.clock.rate" = 48000;
@@ -517,6 +517,33 @@ in
         "default.clock.min-quantum" = 32;
         "default.clock.max-quantum" = 2048;
       };
+    };
+    extraConfig.pipewire-pulse."20-switch-on-connect" = {
+      "pulse.cmd" = [
+        { cmd = "load-module"; args = "module-switch-on-connect"; flags = [ ]; }
+      ];
+    };
+  };
+
+  services.printing = {
+    enable = true;
+    drivers = with pkgs; [
+      gutenprint
+      gutenprintBin
+      hplip
+      cups-filters
+      epson-escpr
+      brlaser
+    ];
+  };
+
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    openFirewall = true;
+    publish = {
+      enable = true;
+      userServices = true;
     };
   };
 
@@ -528,16 +555,16 @@ in
     enable = true;
     scheduler = "scx_rustland";
   };
-  
+
   programs.gnupg.agent = {
     enable = true;
     enableSSHSupport = true;
-    pinentryPackage = pkgs.pinentry-curses; 
+    pinentryPackage = pkgs.pinentry-gnome3;
   };
 
   programs.ssh.startAgent = false;
 
   services.journald.extraConfig = "SystemMaxUse=50M";
 
-  system.stateVersion = cfg.stateVersion; 
+  system.stateVersion = cfg.stateVersion;
 }

@@ -31,7 +31,7 @@ with lib;
 
       stateVersion = mkOption {
         type = types.str;
-        default = "26.05";
+        default = "26.11";
         description = "The state version for NixOS and Home Manager";
       };
 

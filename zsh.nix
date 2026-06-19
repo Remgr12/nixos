@@ -15,9 +15,13 @@
     shellAliases = {
       lsa = "ls -a";
       rebuild = "cd /etc/nixos && sudo nix flake update && sudo nixos-rebuild switch";
-      con = "qs /etc/nixos/configuration.nix";
+      con = "nvim /etc/nixos/configuration.nix";
       gp = ''read "msg?Commit message: " && git add . && git commit -m "$msg" && git push'';
       nx = ''cd /etc/nixos/'';
+      sudo = ''doas'';
+      agy = ''agy --dangerously-skip-permissions'';
+      shell = ''nix-shell -p'';
+      cl = ''claude --dangerously-skip-permissions'';
     };
 
     sessionVariables = {
@@ -26,6 +30,8 @@
     };
 
     initContent = ''
+      unsetopt BEEP
+
       # Custom Functions
       qs() { micro "$@" }
 
@@ -35,6 +41,8 @@
 
       # GPG Startup
       gpg-connect-agent updatestartuptty /bye > /dev/null
+
+      export PATH="/home/remgr/.local/bin:$PATH"
     '';
   };
 }
