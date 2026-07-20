@@ -18,6 +18,7 @@ in
     spawn-at-startup "dbus-update-activation-environment" "--systemd" "WAYLAND_DISPLAY" "XDG_CURRENT_DESKTOP"
     spawn-at-startup "mcontrolcenter"
     spawn-at-startup "gpuishell"
+    spawn-at-startup "noctalia"
 
     spawn-at-startup "copyq"
 
@@ -91,12 +92,22 @@ in
     }
 
     window-rule {
+        match title="waterfox"
+        allow-tearing
+        }
+
+    window-rule {
         match app-id="gamescope"
         allow-tearing
     }
 
     window-rule {
         match app-id=".*Minecraft.*"
+        allow-tearing
+    }
+
+    window-rule {
+        match app-id="HytaleClient"
         allow-tearing
     }
 
@@ -117,6 +128,11 @@ in
    
     window-rule {
         match app-id="cs2"
+        allow-tearing
+    }
+
+    window-rule {
+        match app-id="Backrooms-Win64"
         allow-tearing
     }
     
@@ -150,6 +166,12 @@ in
     }
 
     window-rule {
+        match app-id="gnome-calculator"
+        open-floating true
+    }
+
+
+    window-rule {
         match app-id="gsr-ui"
         open-floating true
     }
@@ -157,7 +179,7 @@ in
     binds {
         Mod+Q { spawn "kitty"; }
         Mod+Return { spawn "kitty"; }
-        Mod+S { spawn "net.waterfox.waterfox"; }
+        Mod+S { spawn "nvidia-offload" "net.waterfox.waterfox"; }
         Mod+Space { spawn "fuzzel"; }
         Mod+E { spawn "nautilus"; }
         Mod+D { spawn "spotify"; }

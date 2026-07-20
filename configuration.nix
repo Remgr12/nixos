@@ -11,12 +11,38 @@ let
   noctalia-shell = inputs.noctalia-shell;
   antigravity-nix = inputs.antigravity-nix;
   llm-agents      = inputs.llm-agents;
+  sops-nix        = inputs.sops-nix;
 in
 {
   imports = [ 
     ./hardware-configuration.nix 
-   #<home-manager/nixos>  
+   #<home-manager/nixos>
+    ./aeroshell.nix
+    sops-nix.nixosModules.sops
   ];
+
+  # --- Secret Management ---
+  sops.defaultSopsFile = ./secrets.yaml;
+  sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ]; 
+
+  sops.secrets."davfs2_password" = {
+    path = "/etc/davfs2/secrets";
+    mode = "0600";
+    owner = "root";
+  };
+
+  # --- WebDAV Mount ---
+  services.davfs2.enable = true;
+  fileSystems."/mnt/mailbox" = {
+    device = "https://dav.mailbox.org/servlet/webdav.infostore/";
+    fsType = "davfs";
+    options = [ 
+      "rw" 
+      "uid=1000"
+      "noauto" 
+      "x-systemd.automount" 
+    ];
+  };
 
   nix = {
     settings = {
@@ -24,16 +50,22 @@ in
       auto-optimise-store = true;
       max-jobs = "auto";
       cores = 0;
+      # Faster fetches: avoid the "download buffer is full" stall, open more
+      # parallel connections, fail fast on dead substituters.
+      download-buffer-size = 268435456; # 256 MiB
+      http-connections = 50;
+      connect-timeout = 5;
+      builders-use-substitutes = true;
       substituters = [
         "https://cache.nixos.org"
         "https://nix-community.cachix.org"
-        "https://cache.garnix.io"
+        # "https://cache.garnix.io"
         "https://noctalia.cachix.org"
       ];
       trusted-public-keys = [
         "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
         "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-        "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
+        # "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
         "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
       ];
     };
@@ -50,7 +82,11 @@ in
   security.doas.enable = true;
   security.doas.extraRules = [{
     users = [ "${cfg.username}" ];
-    keepEnv = true;
+    # keepEnv = false: don't carry the user's full environment into root (closes
+    # the LD_PRELOAD/PATH privesc surface). nixos-rebuild --flake doesn't need it.
+    # If an env-dependent `doas <cmd>` breaks, add it to setEnv rather than
+    # re-enabling keepEnv wholesale.
+    keepEnv = false;
     persist = true;
   }];
 
@@ -66,6 +102,17 @@ in
     "splash"
     "intel_pstate=passive"
   ];
+  
+  programs.aeroshell = {
+    enable = true;
+    fonts.segoe.enable = true;
+    polkit.enable = true;
+    aerothemeplasma = {
+      enable = true;
+      sddm.enable = false;     # Disabled to protect your custom SDDM theme
+      plymouth.enable = false; # Disabled to protect your existing Plymouth setup
+    };
+  };
 
   systemd.services.nvidia-undervolt = {
     description = "Lock NVIDIA GPU Clock to 1635MHz";
@@ -150,6 +197,7 @@ in
   
   services.gvfs.enable = true;
   services.udisks2.enable = true;
+  security.polkit.enable = true;
   boot.supportedFilesystems = [ "ntfs" ];
 
   services.upower.enable = true;
@@ -186,7 +234,7 @@ in
         ./zsh.nix
         ./antigravity.nix
         ./aurora-mpris.nix
-      ];
+        ];
 
       systemd.user.services.i2p = {
         Unit = {
@@ -202,7 +250,7 @@ in
 
       programs.noctalia = {
         enable = true;
-        systemd.enable = true;
+        systemd.enable = false;
         settings = {
           shell.font = "JetBrainsMono Nerd Font";
           theme = {
@@ -330,7 +378,9 @@ in
         stirling-pdf davinci-resolve networkmanagerapplet
         gale fzf teams-for-linux
         i2p mullvad-browser avahi wayvr xdg-desktop-portal-gnome
-	steam-tui steamcmd lutris blockbench aseprite
+    steam-tui steamcmd lutris blockbench aseprite
+        gnome-calculator dbeaver-bin zed-editor
+    cemu heroic
        ];
 
       home.file.".cargo/config.toml".text = ''
@@ -354,7 +404,18 @@ in
   nixpkgs.config.permittedInsecurePackages = [
     "googleearth-pro-7.3.7.1155"
   ];
+  
+  services.desktopManager.plasma6.enable = true;
 
+  environment.plasma6.excludePackages = with pkgs.kdePackages; [
+    plasma-browser-integration
+    konsole
+    oxygen
+    kate
+    elisa
+    khelpcenter
+  ];
+  
   programs.gamescope = {
       enable = true;
       capSysNice = true;
@@ -394,6 +455,7 @@ in
     NIXOS_OZONE_WL = "1";
     __GL_SYNC_TO_VBLANK = "0";
     NVD_BACKEND = "direct";
+    DOTNET_ROOT = "${pkgs.dotnetCorePackages.sdk_9_0}";
   };
 
   hardware.nvidia = {
@@ -415,7 +477,20 @@ in
   powerManagement.cpuFreqGovernor = "schedutil";
   hardware.cpu.intel.updateMicrocode = true;
 
-  programs.gamemode.enable = true;
+  programs.gamemode = {
+    enable = true;
+    settings = {
+      general = {
+        renice = 10;                 # bump game process priority
+        desiredgov = "performance";  # pin CPU to performance governor while gaming
+        igpu_desiredgov = "performance";
+      };
+      cpu = {
+        park_cores = "no";           # 6c/12t non-hybrid: keep all cores live
+        pin_cores = "yes";           # pin the game to physical cores
+      };
+    };
+  };
   zramSwap = {
     enable = true;
     algorithm = "zstd";
@@ -432,6 +507,11 @@ in
     "vm.dirty_ratio" = 10;
     "vm.dirty_background_ratio" = 5;
     "kernel.nmi_watchdog" = 0;
+    # Moderate hardening (no gaming/debug impact): hide kernel pointers from
+    # unprivileged users and restrict dmesg to root. `doas dmesg`/perf as root
+    # still work.
+    "kernel.kptr_restrict" = 1;
+    "kernel.dmesg_restrict" = 1;
   };
 
   boot.kernelPackages = pkgs.linuxPackages_cachyos;
@@ -516,6 +596,28 @@ in
     extraGroups = [ "networkmanager" "wheel" "video" "audio" "storage" "lp" "scanner" ];
   };
 
+  programs.java = {
+    enable = true;
+    package = pkgs.temurin-bin-26;
+  };
+
+  environment.shellAliases = {
+  java8 = "${pkgs.temurin-bin-8}/bin/java";
+  javac8 = "${pkgs.temurin-bin-8}/bin/javac";
+  
+  java17 = "${pkgs.temurin-bin-17}/bin/java";
+  javac17 = "${pkgs.temurin-bin-17}/bin/javac";
+  
+  java21 = "${pkgs.temurin-bin-21}/bin/java";
+  javac21 = "${pkgs.temurin-bin-21}/bin/javac";
+  
+  java25 = "${pkgs.temurin-bin-25}/bin/java";
+  javac25 = "${pkgs.temurin-bin-25}/bin/javac";
+  
+  java26 = "${pkgs.temurin-bin-26}/bin/java";
+  javac26 = "${pkgs.temurin-bin-26}/bin/javac";
+};
+
   environment.systemPackages = with pkgs; [
     (prismlauncher.override {
       jdks = [ jdk8 jdk17 jdk21 jdk25 ];
@@ -524,7 +626,7 @@ in
     wget neovim wl-clipboard fuzzel nautilus file-roller
     loupe mpv pavucontrol playerctl pciutils usbutils lm_sensors libfido2
     git micro ntfs3g glib sbctl oreo-cursors-plus fastfetch xwayland-satellite
-    mcontrolcenter blueman btrfs-assistant cliphist pinentry-gnome3
+    mcontrolcenter blueman btrfs-assistant cliphist pinentry-gnome3 simple-scan
     mold sccache
     system-config-printer
     libappindicator-gtk3 appimage-run mangohud ffmpeg
@@ -532,6 +634,13 @@ in
     mcp-nixos lsfg-vk-ui
     googleearth-pro freetube
     qbittorrent-enhanced
+    docker simple-scan 
+    nim nimble unzip
+    godot-mono dotnetCorePackages.sdk_9_0 python3 nodejs go gcc gnumake ruby odin ols
+        (python3.withPackages (ps: [ ps.pip ]))
+    kotlin 
+    temurin-bin-8 temurin-bin-17 temurin-bin-21 temurin-bin-25 temurin-bin-26 gradle
+    
 
     gawk
     file
@@ -607,7 +716,10 @@ in
   services.irqbalance.enable = true;
   services.scx = {
     enable = true;
-    scheduler = "scx_rustland";
+    # scx_lavd: Latency-criticality Aware Virtual Deadline scheduler. Purpose-built
+    # for gaming/interactive desktop latency, runs in-kernel (BPF) rather than the
+    # userspace round-trip of scx_rustland. Lower overhead, better frame pacing.
+    scheduler = "scx_lavd";
   };
   
   programs.gnupg.agent = {

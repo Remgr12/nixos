@@ -9,6 +9,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    sops-nix = {
+      url = "github:Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     spicetify-nix = {
       url = "github:Gerg-L/spicetify-nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -23,6 +28,11 @@
       url = "github:noctalia-dev/noctalia-shell/main";
     };
 
+    aerothemeplasma-nix = {
+      url = "github:nyakase/aerothemeplasma-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    
     nixvim = {
       url = "github:nix-community/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -56,6 +66,7 @@
         ./options.nix
         ./configuration.nix
         inputs.chaotic.nixosModules.default
+        inputs.aerothemeplasma-nix.nixosModules.aerothemeplasma-nix
 
         home-manager.nixosModules.home-manager {
           home-manager.extraSpecialArgs = { inherit inputs; };

@@ -33,8 +33,16 @@
       options = [ "fmask=0077" "dmask=0077" ];
     };
 
+  # Disk swap is overflow behind zram (zram is prio 5, used first). Encrypt it
+  # with a fresh random key each boot so memory pages spilled here can never be
+  # recovered from the powered-off disk — matches the LUKS FDE threat model.
+  # Referenced by PARTUUID (stable) rather than the swap UUID, which random
+  # encryption rewrites on every boot. NOTE: this precludes hibernation; if you
+  # ever want resume-from-disk, switch to a keyed LUKS swap instead.
   swapDevices =
-    [ { device = "/dev/disk/by-uuid/38d25f80-a79e-48bc-a411-e8f9b6c2b9ff"; }
+    [ { device = "/dev/disk/by-partuuid/f102c6a0-5d60-4337-bb3b-324fab38d499";
+        randomEncryption.enable = true;
+      }
     ];
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";

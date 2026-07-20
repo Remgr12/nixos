@@ -101,6 +101,8 @@
           pyright.enable = true;
           yamlls.enable = true;
           marksman.enable = true;
+	  nimls.enable = true;
+	  csharp_ls.enable = true;
         };
         keymaps.lspBuf = {
           K = "hover";
