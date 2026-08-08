@@ -17,11 +17,9 @@ in
   imports = [ 
     ./hardware-configuration.nix 
    #<home-manager/nixos>
-    ./aeroshell.nix
     sops-nix.nixosModules.sops
   ];
 
-  # --- Secret Management ---
   sops.defaultSopsFile = ./secrets.yaml;
   sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ]; 
 
@@ -31,7 +29,6 @@ in
     owner = "root";
   };
 
-  # --- WebDAV Mount ---
   services.davfs2.enable = true;
   fileSystems."/mnt/mailbox" = {
     device = "https://dav.mailbox.org/servlet/webdav.infostore/";
@@ -50,9 +47,7 @@ in
       auto-optimise-store = true;
       max-jobs = "auto";
       cores = 0;
-      # Faster fetches: avoid the "download buffer is full" stall, open more
-      # parallel connections, fail fast on dead substituters.
-      download-buffer-size = 268435456; # 256 MiB
+      download-buffer-size = 268435456;
       http-connections = 50;
       connect-timeout = 5;
       builders-use-substitutes = true;
@@ -82,10 +77,6 @@ in
   security.doas.enable = true;
   security.doas.extraRules = [{
     users = [ "${cfg.username}" ];
-    # keepEnv = false: don't carry the user's full environment into root (closes
-    # the LD_PRELOAD/PATH privesc surface). nixos-rebuild --flake doesn't need it.
-    # If an env-dependent `doas <cmd>` breaks, add it to setEnv rather than
-    # re-enabling keepEnv wholesale.
     keepEnv = false;
     persist = true;
   }];
@@ -103,16 +94,7 @@ in
     "intel_pstate=passive"
   ];
   
-  programs.aeroshell = {
-    enable = true;
-    fonts.segoe.enable = true;
-    polkit.enable = true;
-    aerothemeplasma = {
-      enable = true;
-      sddm.enable = false;     # Disabled to protect your custom SDDM theme
-      plymouth.enable = false; # Disabled to protect your existing Plymouth setup
-    };
-  };
+  services.resolved.enable = true;
 
   systemd.services.nvidia-undervolt = {
     description = "Lock NVIDIA GPU Clock to 1635MHz";
@@ -202,8 +184,8 @@ in
 
   services.upower.enable = true;
 
+  services.mullvad-vpn.gui.enable = true;
   services.mullvad-vpn.enable = true;
-  services.mullvad-vpn.package = pkgs.mullvad-vpn;
 
   systemd.user.services.polkit-gnome-authentication-agent-1 = {
     description = "gnome-authentication-agent-1";
@@ -341,35 +323,13 @@ in
             marketplace
           ];            
         };
-
-      gtk = {
-        enable = true;
-        theme = {
-          name = "Adwaita-dark";
-          package = pkgs.gnome-themes-extra;
-        };
-        gtk3.extraConfig = {
-          gtk-application-prefer-dark-theme = 1;
-          gtk-error-bell = 0;
-        };
-        gtk4.extraConfig = {
-          gtk-application-prefer-dark-theme = 1;
-          gtk-error-bell = 0;
-        };
-      };
-      
-      qt = {
-        enable = true;
-        platformTheme.name = "adwaita";
-        style.name = "adwaita-dark";
-      };
       
       dconf.settings."org/gnome/desktop/interface".color-scheme = "prefer-dark";
 
       home.packages = with pkgs; [
         thunderbird strawberry goofcord kitty micro
-        prismlauncher weylus mullvad-vpn gh chromium
-        localsend libreoffice-fresh firefox
+        prismlauncher weylus gh chromium
+        libreoffice-fresh firefox
         rustup gcc gnumake ruby odin ols nodejs_26 wireplumber
         (python3.withPackages (ps: [ ps.pip ]))
         btop gemini-cli spicetify-cli protonplus
@@ -378,9 +338,10 @@ in
         stirling-pdf davinci-resolve networkmanagerapplet
         gale fzf teams-for-linux
         i2p mullvad-browser avahi wayvr xdg-desktop-portal-gnome
-    steam-tui steamcmd lutris blockbench aseprite
+        steam-tui steamcmd lutris blockbench aseprite
         gnome-calculator dbeaver-bin zed-editor
-    cemu heroic
+        cemu heroic novelwriter obsidian obs-studio
+        multiviewer-for-f1 rPackages.multiview kdePackages.okular
        ];
 
       home.file.".cargo/config.toml".text = ''
@@ -393,7 +354,8 @@ in
 
       home.sessionVariables = {
         NPM_CONFIG_PREFIX = "$HOME/.npm-global";
-        GTK_CSD = "0"; 
+        GTK_CSD = "0";
+        GTK_THEME = "Celestial";
       };
       home.sessionPath = [ "$HOME/.npm-global/bin" ];
 
@@ -404,21 +366,15 @@ in
   nixpkgs.config.permittedInsecurePackages = [
     "googleearth-pro-7.3.7.1155"
   ];
-  
-  services.desktopManager.plasma6.enable = true;
-
-  environment.plasma6.excludePackages = with pkgs.kdePackages; [
-    plasma-browser-integration
-    konsole
-    oxygen
-    kate
-    elisa
-    khelpcenter
-  ];
-  
+    
   programs.gamescope = {
       enable = true;
       capSysNice = true;
+  };
+  
+  programs.localsend = {
+    enable = true;
+    openFirewall = true;
   };
 
   services.displayManager.sddm = {
@@ -635,7 +591,7 @@ in
     googleearth-pro freetube
     qbittorrent-enhanced
     docker simple-scan 
-    nim nimble unzip
+    nim nimble unzip _7zip-zstd-rar
     godot-mono dotnetCorePackages.sdk_9_0 python3 nodejs go gcc gnumake ruby odin ols
         (python3.withPackages (ps: [ ps.pip ]))
     kotlin 

@@ -66,7 +66,6 @@
         ./options.nix
         ./configuration.nix
         inputs.chaotic.nixosModules.default
-        inputs.aerothemeplasma-nix.nixosModules.aerothemeplasma-nix
 
         home-manager.nixosModules.home-manager {
           home-manager.extraSpecialArgs = { inherit inputs; };

@@ -102,6 +102,11 @@ in
     }
 
     window-rule {
+        match app-id="DyingLightGame_"
+        allow-tearing
+    }
+
+    window-rule {
         match app-id=".*Minecraft.*"
         allow-tearing
     }
